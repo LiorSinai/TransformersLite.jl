@@ -15,6 +15,7 @@ An example model output looks like:
 TransformerClassifier(
      Embed(32, 7455),                   # 238_560 parameters
      PositionEncoding(32),
+     Dropout(0.1),
      TransformerEncoderBlock(
           MultiheadAttention(num_heads=4, head_size=8, 32=>32)(
                denseQ = Dense(32 => 32),  # 1_056 parameters
@@ -22,15 +23,19 @@ TransformerClassifier(
                denseV = Dense(32 => 32),  # 1_056 parameters
                denseO = Dense(32 => 32),  # 1_056 parameters
           )
+          Dropout(0.1),
           LayerNorm(32),                # 64 parameters
           Dense(32 => 128, relu),       # 4_224 parameters
           Dense(128 => 32),             # 4_128 parameters
+          Dropout(0.1),
           LayerNorm(32),                # 64 parameters
-     )     MeanLayer(),
+     )
+     Dense(32 => 1),                    # 33 parameters
+     FlattenLayer(),
      Dense(50 => 5),                    # 255 parameters
-)                  # Total: 19 arrays, 251_519 parameters, 1.083 Mi
+)                  # Total: 21 arrays, 251_552 parameters, 1.083 MiB
 ```
-Please see the `example` folder for utility functions, notebooks and training script which demonstrate the Module's capabilities.
+Please see the `example` folder for utility functions, notebooks and a training script which demonstrate the module's capabilities.
 These examples use tokenizers from my TokenizersLite repository at [https://github.com/LiorSinai/TokenizersLite](https://github.com/LiorSinai/TokenizersLite).
 However any compatible tokenizer can be used.
 
@@ -43,7 +48,7 @@ A similar task was also investigated to predict a positive or negative sentiment
 It should be noted that this task can be solved with simpler models. A TFIDF model paired with logistic regression (≈ 10,000 weights)
 achieved similar accuracy to these models with more than 240,000 weights.
 
-The accuracy achieved on the test data was 86.7% for the binary task and 50.5% for the 5 star classification  task.
+The accuracy achieved was 87.4% for the binary task and 49.9% for the 5 star classification task.
 
 <img src="images/confusion_matrix_regression.png"
      alt="confusion matrix"

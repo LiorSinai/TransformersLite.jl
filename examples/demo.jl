@@ -27,7 +27,10 @@ hyperparameters = Dict(
     "tokenizer" => "bpe",
     "nlabels" => 5,
     "model" => "TransformerClassifier",
+    "pdrop" => 0.1,
+    "dim_embedding" => 32
 )
+nlabels = hyperparameters["nlabels"]
 
 ## Tokenizers
 
@@ -84,14 +87,14 @@ indices_path = "outputs/indices_" * hyperparameters["tokenizer"] * ".bson"
 # BSON.@load indices_path indices
 
 y_train = copy(labels)
-if hyperparameters["nlabels"] == 1
+if nlabels == 1
     y_train[labels .≤ 2] .= 0
     y_train[labels .≥ 4] .= 1
     idxs = labels .!= 3
     y_train = reshape(y_train, 1, :)
 else
     idxs = Base.OneTo(length(labels))
-    y_train = Flux.onehotbatch(y_train, 1:hyperparameters["nlabels"])
+    y_train = Flux.onehotbatch(y_train, 1:nlabels)
 end
 
 X_train, y_train = indices[:, idxs], y_train[:, idxs];
@@ -101,28 +104,33 @@ println("train samples:      ", size(train_data[1]), " ", size(train_data[2]))
 println("validation samples: ", size(val_data[1]), " ", size(val_data[2]))
 
 ## Model 
-dim_embedding = 32
+dim_embedding = hyperparameters["dim_embedding"]
+pdrop = hyperparameters["pdrop"]
 # position_encoding = PositionEncoding(dim_embedding)
 # add_position_encoding(x) = x .+ position_encoding(x)
 # model = Chain(
 #     Embed(dim_embedding, length(indexer)), 
 #     add_position_encoding, 
-#     TransformerEncoderBlock(4, dim_embedding, 64),
-#     MeanLayer(),
-#     Dense(max_length, hyperparameters["nlabels"])
-#     )
+#     Dropout(pdrop),
+#     TransformerEncoderBlock(4, dim_embedding, dim_embedding * 4; pdrop=pdrop),
+#     Dense(dim_embedding, 1),
+#     TransformersLite.FlattenLayer(),
+#     Dense(max_length, nlabels)
+#      )
 model = TransformersLite.TransformerClassifier(
     Embed(dim_embedding, length(indexer)), 
     PositionEncoding(dim_embedding), 
-    TransformerEncoderBlock[TransformerEncoderBlock(4, dim_embedding, dim_embedding * 4)],
-    MeanLayer(), 
-    Dense(max_length, hyperparameters["nlabels"])
+    Dropout(pdrop),
+    TransformerEncoderBlock[TransformerEncoderBlock(4, dim_embedding, dim_embedding * 4; pdrop=pdrop)],
+    Dense(dim_embedding, 1), 
+    FlattenLayer(),
+    Dense(max_length, nlabels)
     )
 display(model)
 
 hyperparameters["trainable parameters"] = sum(length, Flux.params(model));
 
-if hyperparameters["nlabels"] == 1
+if nlabels == 1
     loss(x, y) = Flux.logitbinarycrossentropy(model(x), y)
 else
     loss(x, y) = Flux.logitcrossentropy(model(x), y)

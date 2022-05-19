@@ -20,13 +20,12 @@ export batched_mul, mul4d
 include("attention.jl")
 export MultiheadAttention, scaled_dot_attention
 
-include("mean_layer.jl")
-export MeanLayer
+include("aggregate_layer.jl")
+export MeanLayer, FlattenLayer
 
 include("encoder.jl")
 export TransformerEncoderBlock
 
 include("classifier.jl")
-
 
 end

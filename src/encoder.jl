@@ -1,9 +1,10 @@
-struct TransformerEncoderBlock{MA<:MultiheadAttention, L1<:LayerNorm, D1<:Dense, D2<:Dense, L2<:LayerNorm}
+struct TransformerEncoderBlock{MA<:MultiheadAttention, L1<:LayerNorm, D1<:Dense, D2<:Dense, L2<:LayerNorm, DO<:Dropout}
     multihead_attention::MA
     layer_norm_attention::L1
     dense1::D1
     dense2::D2
     layer_norm_feedforward::L2
+    dropout::DO
 end
 
 # make whole TransformerEncoder trainable
@@ -17,12 +18,13 @@ Create a transfomer encoder block based on "Attention is all you need" (https://
 `dhid` is the size of the hidden layer between the two feedforwards after the attention layer.
 
 """
-TransformerEncoderBlock(nhead::Int, dm::Int, dhid::Int) = TransformerEncoderBlock(
+TransformerEncoderBlock(nhead::Int, dm::Int, dhid::Int; pdrop::Float64=0.1) = TransformerEncoderBlock(
     MultiheadAttention(nhead, dm, dm),
     LayerNorm(dm),
     Dense(dm, dhid, relu),
     Dense(dhid, dm),
-    LayerNorm(dm)
+    LayerNorm(dm),
+    Dropout(pdrop)
 )
 
 function Base.show(io::IO, te::TransformerEncoderBlock)
@@ -45,27 +47,29 @@ function _show_transformer_encoder(io::IO, t::TransformerEncoderBlock; indent=0)
     print(io, "(")
     print(io, "\n")
     _show_multiheadattention(io, t.multihead_attention, indent=inner_indent)
+    Flux._layer_show(io, t.dropout, inner_indent)
     Flux._layer_show(io, t.layer_norm_attention, inner_indent)
     Flux._layer_show(io, t.dense1, inner_indent)
     Flux._layer_show(io, t.dense2, inner_indent)
+    Flux._layer_show(io, t.dropout, inner_indent)
     Flux._layer_show(io, t.layer_norm_attention, inner_indent)
     print(io, " "^indent, ")")
     if indent==0
         Flux._big_finale(io, t)
     else
-        println("")
+        println(io, "")
     end
 end
 
 function (t::TransformerEncoderBlock)(x::A) where {T, N, A<:AbstractArray{T, N}}
     a = t.multihead_attention(x, x, x)
+    a = t.dropout(a)
     res_a = x + a
     res_a = t.layer_norm_attention(res_a)
     z_ff = t.dense1(res_a)
     z_ff = t.dense2(z_ff)
+    z_ff = t.dropout(z_ff)
     res_ff = res_a + z_ff
     res_ff = t.layer_norm_feedforward(res_ff)
     res_ff
 end
-
-
