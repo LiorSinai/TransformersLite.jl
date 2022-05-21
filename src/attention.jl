@@ -12,20 +12,20 @@ end
 Flux.@functor MultiheadAttention (denseQ, denseK, denseV, denseO, )
 
 """
-    MultiheadAttention(nhead::Int, dm::Int, hs::Int, dout::Int)
+    MultiheadAttention(nhead::Int, dm::Int, dh::Int, dout::Int)
     MultiheadAttention(nhead::Int, dm::Int, dout::Int)
 
 Multihead dot product attention Layer. `nhead` is the number of heads, 
-`dm` is the model embedding dimension size, `hs` is the size of each head, 
+`dm` is the model embedding dimension size, `dh` is the size of each head, 
 `dout` is the output size.
 """
-function MultiheadAttention(nhead::Int, dm::Int, hs::Int, dout::Int)
+function MultiheadAttention(nhead::Int, dm::Int, dh::Int, dout::Int)
     MultiheadAttention(
         nhead,
-        Dense(dm, hs*nhead),
-        Dense(dm, hs*nhead),
-        Dense(dm, hs*nhead),
-        Dense(hs*nhead, dout),
+        Dense(dm, dh*nhead),
+        Dense(dm, dh*nhead),
+        Dense(dm, dh*nhead),
+        Dense(dh*nhead, dout),
     )
 end
 
@@ -37,12 +37,12 @@ function MultiheadAttention(nhead::Int, dm::Int, dout::Int)
 end
 
 function Base.show(io::IO, mha::MultiheadAttention)
-    hs = div(size(mha.denseQ.weight)[1], mha.nhead)
+    dh = div(size(mha.denseQ.weight)[1], mha.nhead)
     dm = size(mha.denseQ.weight)[2]
     dout = size(mha.denseO.weight)[1]
     print(io, "MultiheadAttention(")
     print(io, "num_heads=$(mha.nhead), ")
-    print(io, "head_size=$(hs), ")
+    print(io, "head_size=$(dh), ")
     print(io, "$(dm)=>$(dout)")
     print(io, ")")
 end
@@ -75,20 +75,20 @@ function (mha::MultiheadAttention)(query::A1, key::A2, value::A3) where {
     ks = size(key)
     vs = size(value)
 
-    #size(Q) == (hs*nhead, N, B)
+    #size(Q) == (dh*nhead, N, B)
     Q = mha.denseQ(query)
     K = mha.denseK(key)
     V = mha.denseV(value)
 
     dm = size(Q, 1)
-    hs = div(dm, mha.nhead)
-    #size(Q) == (hs*nhead, N, B) => (hs, nhead, N, B) => (hs, N, nhead, B)
-    Q = permutedims(reshape(Q, hs, mha.nhead, qs[2], qs[3]), [1, 3, 2, 4])
-    K = permutedims(reshape(K, hs, mha.nhead, ks[2], ks[3]), [1, 3, 2, 4])
-    V = permutedims(reshape(V, hs, mha.nhead, vs[2], vs[3]), [1, 3, 2, 4])
-    #size(A) == (hs, N, nhead, B)
+    dh = div(dm, mha.nhead)
+    #size(Q) == (dh*nhead, N, B) => (dh, nhead, N, B) => (dh, N, nhead, B)
+    Q = permutedims(reshape(Q, dh, mha.nhead, qs[2], qs[3]), [1, 3, 2, 4])
+    K = permutedims(reshape(K, dh, mha.nhead, ks[2], ks[3]), [1, 3, 2, 4])
+    V = permutedims(reshape(V, dh, mha.nhead, vs[2], vs[3]), [1, 3, 2, 4])
+    #size(A) == (dh, N, nhead, B)
     A = scaled_dot_attention(Q, K, V)
-    #size(A) == (hs, N, nhead, B) => (hs, nhead, N, B) => (dm, N, B)
+    #size(A) == (dh, N, nhead, B) => (dh, nhead, N, B) => (dm, N, B)
     A = permutedims(A, [1, 3, 2, 4])
     A = reshape(A, dm, size(A, 3), size(A, 4))
 
@@ -118,33 +118,29 @@ If the inputs are 3D arrays, the output is
 """
 function scaled_dot_attention(query::A1, key::A2, value::A3) where {
     T, A1 <: AbstractArray{T, 4}, A2 <: AbstractArray{T, 4}, A3 <: AbstractArray{T, 4}}
-    # Batched version. Input is (hs, N, nhead, B)
+    # Batched version. Input is (dh, N, nhead, B)
     dh = size(query, 1)
-    #size(score) == (N, N, nhead, B)
-    atten = one(T)/convert(T, sqrt(dh)) .* batched_mul(key, query, transA=true)
-    score = softmax(atten; dims=1)
-    #size(score) == (hs, N, nhead, B)
-    batched_mul(value, score)
+    keyT = permutedims(key, (2, 1, 3, 4))
+    atten = one(T)/convert(T, sqrt(dh)) .* batched_mul(keyT, query)
+    score = softmax(atten; dims=1) #size(score) == (N, N, nhead, B)
+    batched_mul(value, score) #size(attention) == (dh, N, nhead, B)
 end
 
 function scaled_dot_attention(query::A1, key::A2, value::A3) where {
     T, A1 <: AbstractArray{T, 3}, A2 <: AbstractArray{T, 3}, A3 <: AbstractArray{T, 3}}
-    # Input is (hs, N, nhead)
+    # Input is (dh, N, nhead)
     dh = size(query, 1)
-    #size(score) == (N, N, nhead)
-    atten = one(T)/convert(T, sqrt(dh)) .* batched_mul(batched_transpose(key), query)
-    score = softmax(atten; dims=1)
-    #size(score) == (hs, N, nhead)
-    batched_mul(value, score)
+    keyT = permutedims(key, (2, 1, 3))
+    atten = one(T)/convert(T, sqrt(dh)) .* batched_mul(keyT, query)
+    score = softmax(atten; dims=1) #size(score) == (N, N, nhead)
+    batched_mul(value, score)  #size(attention) == (dh, N, nhead) 
 end
 
 function scaled_dot_attention(query::A1, key::A2, value::A3) where {
     T, A1 <: AbstractMatrix{T}, A2 <: AbstractMatrix{T}, A3 <: AbstractMatrix{T}}
-    ## Matrix version, only for checking answers. Input is (hs, N)
+    ## Matrix version for a single head. Input is (dh, N)
     dh = size(query, 1)
-    #size(score) == (N, N)
     atten = one(T)/convert(T, sqrt(dh)) .* transpose(key) * query
-    score = softmax(atten; dims=1)
-    #size(score) == (hs, N)
-    value * score
+    score = softmax(atten; dims=1) #size(score) == (N, N)
+    value * score #size(attention) == (dh, N)
 end

@@ -1,6 +1,4 @@
-function multiply_test(A, B, C; transA=false, transB=false)
-    transA && (A = permutedims(A, [2,1,3,4]))
-    transB && (B = permutedims(B, [2,1,3,4]))
+function multiply_test(A, B, C)
     for l in 1:size(A, 4)
         for k in 1:size(A, 3)
             if !(A[:, :, k, l]*B[:, :, k, l] ≈ C[:, :, k, l])

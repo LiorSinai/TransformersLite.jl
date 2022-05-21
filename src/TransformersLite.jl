@@ -6,6 +6,7 @@ import NNlib: batched_mul
 using NNlib: gather, batched_transpose, softmax
 using Flux
 using StatsBase
+using Random
 
 include("Embed/tokenizer.jl")
 include("Embed/embed.jl")
