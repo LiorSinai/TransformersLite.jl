@@ -2,8 +2,6 @@ struct IndexTokenizer{T}
     vocabulary::Vector{T}
     unksym::T
     unkidx::Int
-    padsym::T
-    padidx::Int
     function IndexTokenizer(vocab::Vector{T}, unksym::T) where T
         if !(unksym ∈ vocab)
             pushfirst!(vocab, unksym)
