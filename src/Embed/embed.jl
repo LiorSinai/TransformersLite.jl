@@ -18,7 +18,7 @@ function (e::Embed)(x::AbstractArray{Int})
     gather(e.embedding, x) # see rrule using scatter
 end
 
-Base.show(io::IO, e::Embed) = print(io, "Embed($(size(e.embedding, 1)), $(size(e.embedding, 2)))")
+Base.show(io::IO, e::Embed) = print(io, "Embed($(size(e.embedding)))")
 
 function Base.show(io::IO, m::MIME"text/plain", e::Embed)
     Flux._layer_show(io, e)

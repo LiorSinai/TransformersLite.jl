@@ -9,21 +9,25 @@ function accuracy(ŷ, y)
     end
 end
 
+"""
+    batch_matrix(X, Y, col::Int; batch_size=128)
+
+Return a batch from a matrix dataset with indices `X[:, col:batch_size]` and `Y[:, col:batch_size]`. 
+"""
 function batch_matrix(X::AbstractMatrix, Y::AbstractMatrix, col::Int; batch_size=128)
     maxcol = min(col + batch_size - 1, size(X, 2))
     X[:, col:maxcol], Y[:, col:maxcol]
 end;
 
 """
-batched_metric(f, X, Y; batch_size=1024, g=identity)
+    batched_metric(f, X, Y; batch_size=1024, g=identity)
 
 Caculates `f(g(X), Y)` except in bactches and returns a weighted sum by batch size (all equal except for the final batch).
 If `f` takes the mean this will recover the full sample mean.
 Reduces memory load for f. 
-
 """
-function batched_metric(f, X, Y; batch_size=1024, g=identity)
-    result = 0.0f0
+function batched_metric(f, X::AbstractMatrix, Y::AbstractMatrix; batch_size=128, g=identity)
+    result = 0.0
     nsamples = size(X, 2)
     for j in 1:batch_size:nsamples
         batch_ = batch_matrix(X, Y, j, batch_size=batch_size)
@@ -33,7 +37,12 @@ function batched_metric(f, X, Y; batch_size=1024, g=identity)
     result
 end
 
-function split_validation(X, Y, frac=0.1; rng=Random.GLOBAL_RNG)
+"""
+    split_validation(X, Y, frac=0.1; rng=Random.GLOBAL_RNG)
+
+Split a matrix data set into a training and validation set.
+"""
+function split_validation(X::AbstractMatrix, Y::AbstractMatrix, frac=0.1; rng=Random.GLOBAL_RNG)
     nsamples = size(X, 2)
     idxs = shuffle(rng, 1:nsamples)
     ntrain = nsamples - floor(Int, frac * nsamples)
@@ -50,7 +59,7 @@ function train!(loss, ps, data, opt, val_data; n_epochs=100, batch_size=128)
     nsamples = size(train_data[1], 2)
     update_incr = nsamples/batch_size/100
     for e in 1:n_epochs
-        print("$e ")
+        print("\n$e ")
         update_val = 0.0
         idxs = randperm(nsamples)
         X, Y = data[1][:, idxs], data[2][:, idxs]
@@ -82,9 +91,9 @@ function update_history!(history::Dict, model, loss, train_data, val_data)
     push!(history["val_acc"], val_acc)
     push!(history["val_loss"], val_loss)
 
-    @printf "\ntrain_acc=%.4f ; " train_acc * 100
+    @printf "\ntrain_acc=%.4f%% ; " train_acc * 100
     @printf "train_loss=%.4f ; " train_loss
-    @printf "val_acc=%.4f ; " val_acc * 100
-    @printf "val_loss=%.4f \n" val_loss
+    @printf "val_acc=%.4f%% ; " val_acc * 100
+    @printf "val_loss=%.4f ; " val_loss
 end
 

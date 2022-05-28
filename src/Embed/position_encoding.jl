@@ -9,7 +9,7 @@ For each a pair of rows `(2i, 2i+1)` and a position `k`, the encoding is calcula
     W[2i + 1, k] = cos(pos/(1e4^(2i/dim_embedding)))
 
 """
-mutable struct PositionEncoding{W <: AbstractArray}
+struct PositionEncoding{W <: AbstractArray}
     encoding::W
 end
 

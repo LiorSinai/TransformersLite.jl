@@ -18,10 +18,10 @@ Create a transfomer encoder block based on "Attention is all you need" (https://
 `dhid` is the size of the hidden layer between the two feedforwards after the attention layer.
 
 """
-TransformerEncoderBlock(nhead::Int, dm::Int, dhid::Int; pdrop::Float64=0.1) = TransformerEncoderBlock(
+TransformerEncoderBlock(nhead::Int, dm::Int, dhid::Int; pdrop::Float64=0.1, act=relu) = TransformerEncoderBlock(
     MultiheadAttention(nhead, dm, dm),
     LayerNorm(dm),
-    Dense(dm, dhid, relu),
+    Dense(dm, dhid, act),
     Dense(dhid, dm),
     LayerNorm(dm),
     Dropout(pdrop)
