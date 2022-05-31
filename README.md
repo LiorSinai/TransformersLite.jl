@@ -1,6 +1,7 @@
 # TransformersLite
 
-A basic transformer package. This is meant to be for learning. For a much more comprehensive package with CUDA support, APIs for HuggingFace, optimizations and more, please see Transformers.jl at [github.com/chengchingwen/Transformers.jl](https://github.com/chengchingwen/Transformers.jl).
+A basic transformer package. This repository is meant for learning
+and is paired with this [blog post](https://liorsinai.github.io/coding/2022/05/18/transformers.html). For a much more comprehensive package with CUDA support, APIs for HuggingFace, optimizations and more, please see Transformers.jl at [github.com/chengchingwen/Transformers.jl](https://github.com/chengchingwen/Transformers.jl).
 
 This package is designed to work with `Flux`. It provides a multi-head attention layer as described in the paper [Attention is all you need](https://arxiv.org/abs/1706.03762).
 It also provides a simple index tokenizer, a wrapper for an embedding layer, a wrapper for a mean layer, a position encoding layer
