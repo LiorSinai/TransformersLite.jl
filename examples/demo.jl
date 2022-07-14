@@ -1,4 +1,3 @@
-
 using DataFrames
 using Arrow
 using Printf
@@ -132,8 +131,10 @@ hyperparameters["trainable parameters"] = sum(length, Flux.params(model));
 
 if nlabels == 1
     loss(x, y) = Flux.logitbinarycrossentropy(model(x), y)
+    accuracy(ŷ, y) = mean((Flux.sigmoid.(ŷ) .> 0.5) .== y)
 else
     loss(x, y) = Flux.logitcrossentropy(model(x), y)
+    accuracy(ŷ, y) = mean(Flux.onecold(ŷ) .== Flux.onecold(y))
 end
 
 loss(x::Tuple) = loss(x[1], x[2])
@@ -144,7 +145,7 @@ opt = ADAM()
 val_acc = batched_metric(accuracy, val_data[1], val_data[2]; g=model)
 val_loss = batched_metric(loss, val_data[1], val_data[2])
 
-@printf "val_acc=%.4f ; " val_acc * 100
+@printf "val_acc=%.4f%% ; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
 
 directory = "outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
