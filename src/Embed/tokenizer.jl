@@ -37,9 +37,9 @@ end
 function encode(tokenizer::IndexTokenizer{T}, batch::AbstractVector{Vector{T}}) where T
     lengths = map(length, batch)
     indices = fill(tokenizer.unkidx, maximum(lengths), length(batch))
-    for (i, seq) ∈ enumerate(batch)
-        for (j, x) ∈ enumerate(seq)
-            @inbounds indices[j, i] = encode(tokenizer, x)
+    for (j, seq) ∈ enumerate(batch)
+        for (i, x) ∈ enumerate(seq)
+            @inbounds indices[i, j] = encode(tokenizer, x)
         end
     end
     indices
