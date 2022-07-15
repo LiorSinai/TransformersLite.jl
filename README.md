@@ -49,7 +49,8 @@ A similar task was also investigated to predict a positive or negative sentiment
 It should be noted that this task can be solved with simpler models. A TFIDF model paired with logistic regression (≈ 10,000 weights)
 achieved similar accuracy to these models with more than 240,000 weights.
 
-The accuracy achieved was 87.4% for the binary task and 49.9% for the 5 star classification task.
+The accuracy achieved was 87.5% for the binary task and 49.9% for the 5 star classification task.
+For the binary case, a model which scores each sentence individually and then aggregates their results with a parabolic weighted average achieved an accuracy of 89.3%.
 
 <img src="images/confusion_matrix_regression.png"
      alt="confusion matrix"
@@ -62,7 +63,7 @@ The confusion matrix shows that the binary model does indeed mostly predict the 
      alt="bar chart probabilities vs ground truth"
     />
 
-The probabilities for each star are strongly biased in the right way, with 1 star ratings being mostly negative and 5 star ratings mostly positive. The model was not trained on 3 star reviews so here the distribution is almost uniform (random) with a slight negative skew. However this may also be a reflection of the underlying data because humans are not consistent with their ratings for 3 stars. 
+The probabilities for each star are strongly biased in the right way, with 1 star ratings being mostly negative and 5 star ratings mostly positive. The model was not trained on 3 star reviews so here the distribution approaches a uniform distribution (random) with a negative skew. That may also be a reflection of the underlying data because humans are not consistent with their ratings for 3 stars. 
 
 <img src="images/confusion_matrix_classification5.png"
      alt="confusion matrix"
