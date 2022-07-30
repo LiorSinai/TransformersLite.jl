@@ -38,26 +38,27 @@ function Base.show(io::IO, te::TransformerEncoderBlock)
 end
 
 function Base.show(io::IO, m::MIME"text/plain", te::TransformerEncoderBlock)
-    _show_transformer_encoder(io, te)
+    if get(io, :typeinfo, nothing) === nothing  # e.g. top level in REPL
+        _show_transformer_encoder(io, te)
+    elseif !get(io, :compact, false)  # e.g. printed inside a Vector, but not a Matrix
+      _layer_show(io, x)
+    else
+      show(io, x)
+    end
 end
 
-function _show_transformer_encoder(io::IO, t::TransformerEncoderBlock; indent=0)
-    inner_indent = indent + 5
-    print(io, " "^indent, "TransformerEncoderBlock")
-    print(io, "(")
-    print(io, "\n")
-    _show_multiheadattention(io, t.multihead_attention, indent=inner_indent)
-    Flux._layer_show(io, t.dropout, inner_indent)
-    Flux._layer_show(io, t.layer_norm_attention, inner_indent)
-    Flux._layer_show(io, t.dense1, inner_indent)
-    Flux._layer_show(io, t.dense2, inner_indent)
-    Flux._layer_show(io, t.dropout, inner_indent)
-    Flux._layer_show(io, t.layer_norm_attention, inner_indent)
+function _show_transformer_encoder(io::IO, t::TransformerEncoderBlock, indent=0)
+    inner_indent = indent + 2
+    print(io, " "^indent, "TransformerEncoderBlock(\n")
+    _show_multiheadattention(io, t.multihead_attention, inner_indent)
+    for layer in [t.dropout, t.layer_norm_attention, t.dense1, t.dense2, t.dropout, t.layer_norm_feedforward]
+        Flux._layer_show(io, layer, inner_indent)
+    end
     print(io, " "^indent, ")")
-    if indent==0
+    if indent == 0
         Flux._big_finale(io, t)
     else
-        println(io, "")
+        println(io, ",")
     end
 end
 

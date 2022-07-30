@@ -3,6 +3,7 @@ using Arrow
 using Printf
 using BSON, JSON
 using Flux
+using Flux: DataLoader
 using Unicode
 using Dates
 
@@ -27,7 +28,6 @@ hyperparameters = Dict(
     "seed" => 2718,
     "tokenizer" => "sentences+bpe",
     "nlabels" => 1,
-    "model" => "TransformerClassifier",
     "pdrop" => 0.1,
     "dim_embedding" => 32,
     "max_length" => 30,
@@ -123,6 +123,7 @@ base_model = TransformersLite.TransformerClassifier(
 
 model = SentenceClassifier(base_model, Flux.sigmoid, parabolic_weighted_average)
 
+hyperparameters["model"] = "$(typeof(model).name.wrapper)-$(typeof(model.base_model).name.wrapper)"
 hyperparameters["trainable parameters"] = sum(length, Flux.params(model));
 
 loss(x, y) = Flux.binarycrossentropy(model(x), y)
@@ -132,8 +133,13 @@ accuracy(ŷ, y) = mean((ŷ .> 0.5) .== y)
 ## Training 
 opt = ADAM()
 
-val_acc = batched_metric(accuracy, val_data[1], val_data[2]; g=model)
-val_loss = batched_metric(loss, val_data[1], val_data[2])
+batch_size = 32
+
+train_data_loader = DataLoader(train_data; batchsize=batch_size, shuffle=true)
+val_data_loader = DataLoader(val_data; batchsize=batch_size, shuffle=false)
+
+val_acc = batched_metric(accuracy, val_data_loader; g=model)
+val_loss = batched_metric(loss, val_data_loader)
 
 @printf "val_acc=%.4f%%; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
@@ -144,12 +150,8 @@ output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
 hyperparameter_path = joinpath(directory, "hyperparameters.json")
 
-open(hyperparameter_path, "w") do f
-    JSON.print(f, hyperparameters)
-end
-
 start_time = time_ns()
-history = train!(loss, Flux.params(model), train_data, opt, val_data; n_epochs=10, batch_size=128)
+history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=10)
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9
@@ -157,6 +159,10 @@ println("done training")
 ## Save 
 
 BSON.@save output_path model
+
+open(hyperparameter_path, "w") do f
+    JSON.print(f, hyperparameters)
+end
 
 open(history_path,"w") do f
   JSON.print(f, history)

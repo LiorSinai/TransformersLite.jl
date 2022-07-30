@@ -3,6 +3,7 @@ using Arrow
 using Printf
 using BSON, JSON
 using Flux
+using Flux: DataLoader
 using Unicode
 using Dates
 
@@ -25,7 +26,6 @@ hyperparameters = Dict(
     "seed" => 2718,
     "tokenizer" => "bpe",
     "nlabels" => 5,
-    "model" => "TransformerClassifier",
     "pdrop" => 0.1,
     "dim_embedding" => 32
 )
@@ -80,7 +80,7 @@ labels = df[!, :stars]
 max_length = 50
 indices_path = "outputs/indices_" * hyperparameters["tokenizer"] * ".bson"
 @time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents) #takes about 30 seconds for all documents
-@time indices = indexer(tokens) #takes about 12 seconds for all documents
+@time indices = indexer(tokens)
 
 # BSON.@save indices_path indices
 # BSON.@load indices_path indices
@@ -127,6 +127,7 @@ model = TransformersLite.TransformerClassifier(
     )
 display(model)
 
+hyperparameters["model"] = "$(typeof(model).name.wrapper)"
 hyperparameters["trainable parameters"] = sum(length, Flux.params(model));
 
 if nlabels == 1
@@ -142,8 +143,12 @@ loss(x::Tuple) = loss(x[1], x[2])
 ## Training 
 opt = ADAM()
 
-val_acc = batched_metric(accuracy, val_data[1], val_data[2]; g=model)
-val_loss = batched_metric(loss, val_data[1], val_data[2])
+batch_size = 32
+train_data_loader = DataLoader(train_data; batchsize=batch_size, shuffle=true)
+val_data_loader = DataLoader(val_data; batchsize=batch_size, shuffle=false)
+
+val_acc = batched_metric(accuracy, val_data_loader; g=model)
+val_loss = batched_metric(loss, val_data_loader)
 
 @printf "val_acc=%.4f%% ; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
@@ -154,12 +159,8 @@ output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
 hyperparameter_path = joinpath(directory, "hyperparameters.json")
 
-open(hyperparameter_path, "w") do f
-    JSON.print(f, hyperparameters)
-end
-
 start_time = time_ns()
-history = train!(loss, Flux.params(model), train_data, opt, val_data; n_epochs=10, batch_size=128)
+history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=10)
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9
@@ -167,6 +168,10 @@ println("done training")
 ## Save 
 
 BSON.@save output_path model
+
+open(hyperparameter_path, "w") do f
+    JSON.print(f, hyperparameters)
+end
 
 open(history_path,"w") do f
   JSON.print(f, history)

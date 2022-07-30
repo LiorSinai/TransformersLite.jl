@@ -51,11 +51,9 @@ function Base.show(io::IO, m::MIME"text/plain", mha::MultiheadAttention)
     _show_multiheadattention(io, mha)
 end
 
-function _show_multiheadattention(io::IO, mha::MultiheadAttention; indent=0)
-    inner_indent = indent + 5
-    print(io, " "^indent, mha)
-    print(io,"(")
-    print(io, "\n")
+function _show_multiheadattention(io::IO, mha::MultiheadAttention, indent=0)
+    inner_indent = indent + 2
+    print(io, " "^indent, mha, "(\n") 
     Flux._layer_show(io, mha.denseQ, inner_indent, "denseQ")
     Flux._layer_show(io, mha.denseK, inner_indent, "denseK")
     Flux._layer_show(io, mha.denseV, inner_indent, "denseV")
@@ -64,7 +62,7 @@ function _show_multiheadattention(io::IO, mha::MultiheadAttention; indent=0)
     if indent==0
         Flux._big_finale(io, mha)
     else 
-        println(io, "")
+        println(io, ",")
     end
 end
 
