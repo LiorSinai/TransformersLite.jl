@@ -6,6 +6,7 @@ using Flux
 using Flux: DataLoader
 using Unicode
 using Dates
+using StatsBase: mean
 
 using TokenizersLite
 using TransformersLite
@@ -20,7 +21,8 @@ checksum = readdir(path)[1]
 filepath = joinpath(path, checksum, filename)
 
 df = DataFrame(Arrow.Table(filepath))
-display(df)
+display(first(df, 20))
+println("")
 
 hyperparameters = Dict(
     "seed" => 2718,
@@ -51,7 +53,9 @@ vocab = load_vocab(path_vocab)
 indexer = IndexTokenizer(vocab, "[UNK]")
 
 display(tokenizer)
+println("")
 display(indexer)
+println("")
 
 ## Pipeline
 function clean(s::AbstractString)
@@ -120,12 +124,15 @@ model = TransformersLite.TransformerClassifier(
     Embed(dim_embedding, length(indexer)), 
     PositionEncoding(dim_embedding), 
     Dropout(pdrop),
-    TransformerEncoderBlock[TransformerEncoderBlock(4, dim_embedding, dim_embedding * 4; pdrop=pdrop)],
+    TransformerEncoderBlock[
+        TransformerEncoderBlock(4, dim_embedding, dim_embedding * 4; pdrop=pdrop)
+    ],
     Dense(dim_embedding, 1), 
     FlattenLayer(),
     Dense(max_length, nlabels)
     )
 display(model)
+println("")
 
 hyperparameters["model"] = "$(typeof(model).name.wrapper)"
 hyperparameters["trainable parameters"] = sum(length, Flux.params(model));

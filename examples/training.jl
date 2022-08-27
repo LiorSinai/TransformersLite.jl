@@ -1,6 +1,6 @@
-using Flux, StatsBase
+using Flux
 using Random
-using ProgressBars
+using ProgressMeter
 
 """
     batched_metric(f, data; g=identity)
@@ -41,7 +41,7 @@ function split_validation(X::AbstractVector, Y::AbstractVector, frac=0.1; rng=Ra
     (X[idxs[1:ntrain]], Y[idxs[1:ntrain]]), (X[idxs[ntrain+1:end]], Y[idxs[ntrain+1:end]])
 end
 
-function train!(loss, ps, data, opt, val_data; n_epochs=100)
+function train!(loss, ps, data, opt, val_data; n_epochs=10)
     history = Dict(
         "train_acc"=>Float64[], 
         "train_loss"=>Float64[], 
@@ -50,13 +50,13 @@ function train!(loss, ps, data, opt, val_data; n_epochs=100)
         )
     for epoch in 1:n_epochs
         ps = Flux.Params(ps)
-        iter = ProgressBar(data)
-        set_description(iter, "epoch $epoch/$n_epochs")
-        for Xy in iter
+        progress = Progress(length(data); desc="epoch $epoch/$n_epochs")
+        for Xy in data
             gs = gradient(ps) do
                 loss(Xy)
             end
             Flux.update!(opt, ps, gs)
+            ProgressMeter.next!(progress)
         end
         update_history!(history, model, loss, data, val_data)
     end
@@ -79,5 +79,6 @@ function update_history!(history::Dict, model, loss, train_data, val_data)
     @printf "train_loss=%.4f; " train_loss
     @printf "val_acc=%.4f%%; " val_acc * 100
     @printf "val_loss=%.4f ;" val_loss
+    println("")
 end
 
