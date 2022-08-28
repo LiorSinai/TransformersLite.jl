@@ -5,8 +5,7 @@ import ChainRulesCore: rrule, NoTangent
 import NNlib: batched_mul
 using NNlib: gather, batched_transpose, softmax
 using Flux
-using StatsBase
-using Random
+using StatsBase: mean
 
 include("Embed/tokenizer.jl")
 include("Embed/embed.jl")

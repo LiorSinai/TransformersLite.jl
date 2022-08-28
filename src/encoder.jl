@@ -41,9 +41,9 @@ function Base.show(io::IO, m::MIME"text/plain", te::TransformerEncoderBlock)
     if get(io, :typeinfo, nothing) === nothing  # e.g. top level in REPL
         _show_transformer_encoder(io, te)
     elseif !get(io, :compact, false)  # e.g. printed inside a Vector, but not a Matrix
-      Flux._layer_show(io, x)
+      Flux._layer_show(io, te)
     else
-      show(io, x)
+      show(io, te)
     end
 end
 

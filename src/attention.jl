@@ -1,5 +1,3 @@
-
-
 struct MultiheadAttention{Q<:Dense, K<:Dense, V<:Dense, O<:Dense}
     nhead::Int
     denseQ::Q
@@ -59,7 +57,7 @@ function _show_multiheadattention(io::IO, mha::MultiheadAttention, indent=0)
     Flux._layer_show(io, mha.denseV, inner_indent, "denseV")
     Flux._layer_show(io, mha.denseO, inner_indent, "denseO")
     print(io, " "^indent, ")")
-    if indent==0
+    if indent == 0
         Flux._big_finale(io, mha)
     else 
         println(io, ",")

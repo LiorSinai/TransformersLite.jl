@@ -1,3 +1,12 @@
+using Flux.CUDA
+using Random
+if has_cuda()
+    # https://github.com/JuliaGPU/CUDA.jl/issues/1508 
+    # and https://discourse.julialang.org/t/package-entanglement-why-using-one-package-breaks-another/
+    # CUDA + DataFrames breaks dropout
+    a = CuArray{Float32}(undef, 2)
+    Random.rand!(CUDA.default_rng(), a)
+end
 using DataFrames
 using Arrow
 using Printf
@@ -10,12 +19,11 @@ using StatsBase: mean
 
 using TokenizersLite
 using TransformersLite
-
-using Revise
-includet("training.jl")
+include("training.jl")
 
 path = "path\\to\\amazon_reviews_multi\\en\\1.0.0\\"
 filename = "amazon_reviews_multi-train.arrow"
+to_device = gpu # gpu or cpu
 
 checksum = readdir(path)[1]
 filepath = joinpath(path, checksum, filename)
@@ -83,24 +91,24 @@ documents = df[!, :review_body]
 labels = df[!, :stars]
 max_length = 50
 indices_path = "outputs/indices_" * hyperparameters["tokenizer"] * ".bson"
-@time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents) #takes about 30 seconds for all documents
+@time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents)
 @time indices = indexer(tokens)
 
 # BSON.@save indices_path indices
 # BSON.@load indices_path indices
 
-y_train = copy(labels)
+y_labels = Int.(labels)
 if nlabels == 1
-    y_train[labels .≤ 2] .= 0
-    y_train[labels .≥ 4] .= 1
+    y_labels[labels .≤ 2] .= 0
+    y_labels[labels .≥ 4] .= 1
     idxs = labels .!= 3
-    y_train = reshape(y_train, 1, :)
+    y_labels = reshape(y_labels, 1, :)
 else
     idxs = Base.OneTo(length(labels))
-    y_train = Flux.onehotbatch(y_train, 1:nlabels)
+    y_labels = Flux.onehotbatch(y_labels, 1:nlabels)
 end
 
-X_train, y_train = indices[:, idxs], y_train[:, idxs];
+X_train, y_train = indices[:, idxs], y_labels[:, idxs];
 train_data, val_data = split_validation(X_train, y_train; rng=MersenneTwister(hyperparameters["seed"]))
 
 println("train samples:      ", size(train_data[1]), " ", size(train_data[2]))
@@ -109,7 +117,7 @@ println("validation samples: ", size(val_data[1]), " ", size(val_data[2]))
 ## Model 
 dim_embedding = hyperparameters["dim_embedding"]
 pdrop = hyperparameters["pdrop"]
-# position_encoding = PositionEncoding(dim_embedding)
+# position_encoding = PositionEncoding(dim_embedding) |> to_device
 # add_position_encoding(x) = x .+ position_encoding(x)
 # model = Chain(
 #     Embed(dim_embedding, length(indexer)), 
@@ -133,6 +141,7 @@ model = TransformersLite.TransformerClassifier(
     )
 display(model)
 println("")
+model = to_device(model) 
 
 hyperparameters["model"] = "$(typeof(model).name.wrapper)"
 hyperparameters["trainable parameters"] = sum(length, Flux.params(model));
@@ -151,8 +160,8 @@ loss(x::Tuple) = loss(x[1], x[2])
 opt = ADAM()
 
 batch_size = 32
-train_data_loader = DataLoader(train_data; batchsize=batch_size, shuffle=true)
-val_data_loader = DataLoader(val_data; batchsize=batch_size, shuffle=false)
+train_data_loader = DataLoader(train_data |> to_device; batchsize=batch_size, shuffle=true)
+val_data_loader = DataLoader(val_data |> to_device; batchsize=batch_size, shuffle=false)
 
 val_acc = batched_metric(accuracy, val_data_loader; g=model)
 val_loss = batched_metric(loss, val_data_loader)
@@ -174,6 +183,7 @@ println("done training")
 
 ## Save 
 
+model = model |> cpu
 BSON.@save output_path model
 
 open(hyperparameter_path, "w") do f

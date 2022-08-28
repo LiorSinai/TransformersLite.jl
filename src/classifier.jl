@@ -2,11 +2,11 @@ struct TransformerClassifier{
         E<:Embed, 
         PE<:PositionEncoding, 
         DO<:Dropout, 
-        TEB<:Vector{TransformerEncoderBlock}, 
+        TEB<:Vector{<:TransformerEncoderBlock}, 
         A, 
         f<:FlattenLayer, 
         D<:Dense
-    }
+    } 
     embed::E
     position_encoding::PE
     dropout::DO

@@ -1,6 +1,7 @@
 using Flux
-using Random
+using Random: shuffle, MersenneTwister
 using ProgressMeter
+using Printf
 
 """
     batched_metric(f, data; g=identity)
