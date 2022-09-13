@@ -1,4 +1,5 @@
 using Flux
+using Flux: DataLoader
 using Random: shuffle, MersenneTwister
 using ProgressMeter
 using Printf
@@ -16,12 +17,17 @@ function batched_metric(f, data; g=identity)
     num_observations = 0
     for (x, y) in data
         metric = f(g(x), y) 
-        batch_size = Flux.numobs(x) 
+        batch_size = count_observations(x) 
         result += metric * batch_size
         num_observations += batch_size
     end
     result / num_observations
 end
+
+count_observations(data::D) where {D<:DataLoader} = count_observations(data.data)
+count_observations(data::Tuple) = count_observations(data[1])
+count_observations(data::AbstractArray{<:Any,N}) where {N} = size(data, N)
+count_observations(data) = length(data)
 
 """
     split_validation(X, Y, frac=0.1; rng)
