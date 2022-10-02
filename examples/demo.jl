@@ -94,9 +94,6 @@ indices_path = "outputs/indices_" * hyperparameters["tokenizer"] * ".bson"
 @time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents)
 @time indices = indexer(tokens)
 
-# BSON.@save indices_path indices
-# BSON.@load indices_path indices
-
 y_labels = Int.(labels)
 if nlabels == 1
     y_labels[labels .≤ 2] .= 0
@@ -184,7 +181,18 @@ println("done training")
 ## Save 
 
 model = model |> cpu
-BSON.@save output_path model
+if haspropery(tokenizer, :cache)
+    # empty cache
+    tokenizer = similar(tokenizer)
+end
+BSON.bson(
+    output_path, 
+    Dict(
+        :model=> model, 
+        :tokenizer=>tokenizer,
+        :indexer=>indexer
+    )
+    )
 
 open(hyperparameter_path, "w") do f
     JSON.print(f, hyperparameters)

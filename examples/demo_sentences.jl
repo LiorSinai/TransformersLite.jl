@@ -158,7 +158,18 @@ println("done training")
 
 ## Save 
 
-BSON.@save output_path model
+if haspropery(tokenizer, :cache)
+    tokenizer = similar(tokenizer)
+end
+BSON.bson(
+    output_path, 
+    Dict(
+        :model=> model, 
+        :tokenizer=>tokenizer,
+        :indexer=>indexer,
+        :sentence_splitter=>sentence_splitter
+    )
+    )
 
 open(hyperparameter_path, "w") do f
     JSON.print(f, hyperparameters)
