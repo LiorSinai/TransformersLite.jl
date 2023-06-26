@@ -102,15 +102,21 @@ function (mha::MultiheadAttention)(query::A1, key::A2, value::A3) where {
 end
 
 """
-    attention(query, key, value)
+    scaled_dot_attention(query, key, value)
 
-Attention calculation for a transformer. If the inputs are 4D arrays, the output is 
+Scaled dot attention as proposed in [Attention Is All You Need](https://arxiv.org/abs/1706.03762). 
+
+If the inputs are matrices, the output is:
     
-    A[:, : h, b] = 1/sqrt(dh) * value[:, : h, b] * softmax(transpose(key[:, : h, b]) * query[:, : h, b]))
+    A = 1/sqrt(dh) * value * softmax(transpose(key) * query))
 
 If the inputs are 3D arrays, the output is
 
-    A[:, : h] = 1/sqrt(dh) * value[:, : h] * softmax(transpose(key[:, : h]) * query[:, : h]))
+    A[:, :, h] = 1/sqrt(dh) * value[:, :, h] * softmax(transpose(key[:, :, h]) * query[:, :, h]))   
+
+If the inputs are 4D arrays, the output is 
+    
+    A[:, :, h, b] = 1/sqrt(dh) * value[:, :, h, b] * softmax(transpose(key[:, :, h, b]) * query[:, :, h, b]))
 """
 function scaled_dot_attention(query::A1, key::A2, value::A3) where {
     T, A1 <: AbstractArray{T, 4}, A2 <: AbstractArray{T, 4}, A3 <: AbstractArray{T, 4}}
