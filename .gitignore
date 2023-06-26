@@ -23,8 +23,10 @@ docs/site/
 # environment.
 Manifest.toml
 
-### 
+### IDEs
 .vscode
 .ipynb_checkpoints
 
+### data
 outputs/
+examples/datasets
