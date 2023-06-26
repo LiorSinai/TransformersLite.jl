@@ -44,13 +44,22 @@ Please see the [example](/examples/) folder for utility functions, notebooks and
 These examples use tokenizers from my TokenizersLite repository at [https://github.com/LiorSinai/TokenizersLite](https://github.com/LiorSinai/TokenizersLite).
 However any compatible tokenizer can be used.
 
+To run the examples:
+```bash
+cd examples
+python download_amazon_reviews.py
+julia demo.jl --threads auto
+### after training completes
+jupyter notebook
+```
+
 ## Case study
 
-A simple use case of Amazon Reviews from [HuggingFace](https://huggingface.co/datasets/amazon_reviews_multi) was investigated.
-The task was given a text input to predict the star rating. 
+The use case of Amazon Reviews from [HuggingFace](https://huggingface.co/datasets/amazon_reviews_multi) was investigated.
+The task was to predict the star rating on a 5 star scale given a review. 
 A simpler task was also investigated to predict a positive or negative sentiment with 1-2 stars labelled negative, 4-5 stars labelled positive and 3 stars removed. Only the English subset of the dataset was used with 200,000 training samples and 5,000 test samples.
 
-It should be noted that this task can be solved with simpler models. A TFIDF model paired with logistic regression (≈ 10,000 weights)
+It should be noted that this task can be solved with simpler models. A TFIDF model paired with logistic regression with approximately 10,000 weights
 achieved similar accuracy to these models with more than 240,000 weights.
 
 The accuracy achieved was 87.5% for the binary task and 49.9% for the 5 star classification task.
@@ -95,3 +104,36 @@ julia> using TransformersLite
 ```
 
 Done. 
+
+## Dependencies
+
+Other than Julia this requires:
+- Python for the HuggingFace datasets package. 
+- Jupyter notebooks.
+
+Optional packages:
+- TokenisersLite: [https://github.com/LiorSinai/TokenizersLite](https://github.com/LiorSinai/TokenizersLite).
+- BytePairEncoding: [https://github.com/chengchingwen/BytePairEncoding.jl](https://github.com/chengchingwen/BytePairEncoding.jl).
+
+
+## Trouble shooting
+
+### CUDA + DataFrames breaking dropout
+
+The following error may occur:
+```
+ERROR: LoadError: InvalidIRError: compiling kernel rand!(CuDeviceVector{Float32, 1}, UInt32, UInt32) resulted in invalid LLVM IR
+Reason: unsupported dynamic function invocation (call to CUDA.Philox2x32{R}() where R in CUDA at ~/.julia/packages/CUDA/01uIm/src/device/random.jl:46)
+```
+
+This error does not seem to occur in Julia 1.8 or greater.
+
+If it persists, after a `using Random` and before `using DataFrames` add:
+```Julia
+if has_cuda()
+    a = CuArray{Float32}(undef, 2)
+    Random.rand!(CUDA.default_rng(), a)
+end
+```
+
+See https://github.com/JuliaGPU/CUDA.jl/issues/1508  and https://discourse.julialang.org/t/package-entanglement-why-using-one-package-breaks-another/. 

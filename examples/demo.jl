@@ -1,12 +1,5 @@
 using Flux.CUDA
 using Random
-if has_cuda()
-    # https://github.com/JuliaGPU/CUDA.jl/issues/1508 
-    # and https://discourse.julialang.org/t/package-entanglement-why-using-one-package-breaks-another/
-    # CUDA + DataFrames breaks dropout
-    a = CuArray{Float32}(undef, 2)
-    Random.rand!(CUDA.default_rng(), a)
-end
 using DataFrames
 using Arrow
 using Printf
@@ -21,7 +14,7 @@ using TokenizersLite
 using TransformersLite
 include("training.jl")
 
-path = "path\\to\\amazon_reviews_multi\\en\\1.0.0\\"
+path = "datasets\\amazon_reviews_multi\\en\\1.0.0\\"
 filename = "amazon_reviews_multi-train.arrow"
 to_device = gpu # gpu or cpu
 
@@ -166,7 +159,7 @@ val_loss = batched_metric(loss, val_data_loader)
 @printf "val_acc=%.4f%% ; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
 
-directory = "outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
+directory = "..\\outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
 mkdir(directory)
 output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
