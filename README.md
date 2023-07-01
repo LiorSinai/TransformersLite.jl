@@ -46,6 +46,7 @@ However any compatible tokenizer can be used.
 
 To run the examples:
 ```bash
+mkdir outputs
 cd examples
 python download_amazon_reviews.py
 julia demo.jl --threads auto
@@ -105,10 +106,10 @@ julia> using TransformersLite
 
 Done. 
 
-## Dependencies
+### Dependencies
 
-Other than Julia this requires:
-- Python for the HuggingFace datasets package. 
+Other than Julia this requires Python for:
+- HuggingFace datasets package. 
 - Jupyter notebooks.
 
 Optional packages:
@@ -116,9 +117,9 @@ Optional packages:
 - BytePairEncoding: [https://github.com/chengchingwen/BytePairEncoding.jl](https://github.com/chengchingwen/BytePairEncoding.jl).
 
 
-## Trouble shooting
+## Troubleshooting
 
-### CUDA + DataFrames breaking dropout
+### CUDA & DataFrames breaks dropout
 
 The following error may occur:
 ```
@@ -128,7 +129,7 @@ Reason: unsupported dynamic function invocation (call to CUDA.Philox2x32{R}() wh
 
 This error does not seem to occur in Julia 1.8 or greater.
 
-If it persists, after a `using Random` and before `using DataFrames` add:
+If it persists, after `using Random` and before `using DataFrames` add:
 ```Julia
 if has_cuda()
     a = CuArray{Float32}(undef, 2)

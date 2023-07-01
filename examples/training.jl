@@ -25,7 +25,7 @@ function batched_metric(f, data; g=identity)
 end
 
 count_observations(data::D) where {D<:DataLoader} = count_observations(data.data)
-count_observations(data::Tuple) = count_observations(data[1])
+count_observations(data::Tuple) = count_observations(data[1]) # assume data[1] are samples and data[2] are labels
 count_observations(data::AbstractArray{<:Any,N}) where {N} = size(data, N)
 count_observations(data) = length(data)
 
@@ -88,4 +88,3 @@ function update_history!(history::Dict, model, loss, train_data, val_data)
     @printf "val_loss=%.4f ;" val_loss
     println("")
 end
-

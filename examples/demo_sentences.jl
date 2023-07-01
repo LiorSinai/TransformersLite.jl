@@ -6,15 +6,15 @@ using Flux
 using Flux: DataLoader
 using Unicode
 using Dates
+using StatsBase: mean
 
 using TokenizersLite
 using TransformersLite
+include("utilities.jl")
+include("training.jl")
+include("SentenceClassifier.jl")
 
-using Revise
-includet("training.jl")
-includet("SentenceClassifier.jl")
-
-path = "path\\to\\amazon_reviews_multi\\en\\1.0.0\\"
+path = "datasets\\amazon_reviews_multi\\en\\1.0.0\\"
 filename = "amazon_reviews_multi-train.arrow"
 file_test = "amazon_reviews_multi-test.arrow" ;
 
@@ -22,7 +22,8 @@ checksum = readdir(path)[1]
 filepath = joinpath(path, checksum, filename)
 
 df = DataFrame(Arrow.Table(filepath))
-display(df)
+display(first(df, 20))
+println("")
 
 hyperparameters = Dict(
     "seed" => 2718,
@@ -48,33 +49,9 @@ indexer = IndexTokenizer(vocab, "[UNK]")
 display(sentence_splitter)
 display(tokenizer)
 display(indexer)
+println("")
 
-## Pipeline
-function clean(s::AbstractString)
-    s = lowercase(s)
-    s = Unicode.normalize(s, :NFD)
-    s = replace(s, r"['`’\u200d\p{M}]" => "") # contractions, zero width joiner and marks from normalization
-    s = replace(s, r"\n" => " ")
-end
-
-function preprocess(document, tokenizer; 
-    pattern = r"[A-Za-z][A-Za-z]+\b", 
-    max_length::Union{Nothing, Int}=nothing
-    )
-    tokens_all = Vector{String}[]
-    for sentence in document
-        sentence = clean(sentence)
-        words = map(m->string(m.match), eachmatch(pattern, sentence))
-        tokens = tokenizer(words)
-        if !isnothing(max_length)
-            if length(tokens) > max_length
-                tokens = tokens[1:max_length]
-            end
-        end
-        push!(tokens_all, tokens)
-    end
-    tokens_all
-end
+## Tokens
 
 function pad!(v::Vector{String}, sym::String, max_length::Int)
     if length(v) < max_length
@@ -83,16 +60,15 @@ function pad!(v::Vector{String}, sym::String, max_length::Int)
     end
 end
 
-## Tokens
-
 documents = df[!, :review_body]
-documents = [sentence_splitter(d) for d in documents]
 labels = df[!, :stars]
 max_length = hyperparameters["max_length"]
-@time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents)
-# hack to make sure all the indices have the same number of rows:
-for i in 1:length(tokens)
-    pad!(tokens[i][1], tokenizer.unksym, max_length)
+tokens = Vector{Vector{String}}[]
+@time for doc in documents
+    sentences = sentence_splitter(doc)
+    tokens_doc = map(s->preprocess(s, tokenizer, max_length=max_length), sentences)
+    pad!(tokens_doc[1], tokenizer.unksym, max_length) # hack to ensure all indices have common length
+    push!(tokens, tokens_doc)
 end
 @time indices = map(t->indexer(t), tokens) 
 
@@ -106,6 +82,7 @@ train_data, val_data = split_validation(X_train, y_train; rng=MersenneTwister(hy
 
 println("train samples:      ", size(train_data[1]), " ", size(train_data[2]))
 println("validation samples: ", size(val_data[1]), " ", size(val_data[2]))
+println("")
 
 ## Model 
 dim_embedding = hyperparameters["dim_embedding"]
@@ -143,12 +120,19 @@ val_loss = batched_metric(loss, val_data_loader)
 
 @printf "val_acc=%.4f%%; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
+println("")
 
-directory = "outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
+directory = "..\\outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
 mkdir(directory)
 output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
 hyperparameter_path = joinpath(directory, "hyperparameters.json")
+
+open(hyperparameter_path, "w") do f
+    JSON.print(f, hyperparameters)
+end
+println("saved hyperparameters to $(hyperparameter_path).")
+println("")
 
 start_time = time_ns()
 history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=10)
@@ -158,7 +142,7 @@ println("done training")
 
 ## Save 
 
-if haspropery(tokenizer, :cache)
+if hasproperty(tokenizer, :cache)
     tokenizer = similar(tokenizer)
 end
 BSON.bson(
@@ -170,11 +154,9 @@ BSON.bson(
         :sentence_splitter=>sentence_splitter
     )
     )
-
-open(hyperparameter_path, "w") do f
-    JSON.print(f, hyperparameters)
-end
+println("saved model to $(output_path).")
 
 open(history_path,"w") do f
   JSON.print(f, history)
 end
+println("saved history to $(history_path).")
