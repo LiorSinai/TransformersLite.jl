@@ -12,6 +12,7 @@ using StatsBase: mean
 
 using TokenizersLite
 using TransformersLite
+include("utilities.jl")
 include("training.jl")
 
 path = "datasets\\amazon_reviews_multi\\en\\1.0.0\\"
@@ -33,6 +34,7 @@ hyperparameters = Dict(
     "dim_embedding" => 32
 )
 nlabels = hyperparameters["nlabels"]
+n_epochs = 10
 
 ## Tokenizers
 
@@ -57,26 +59,6 @@ display(tokenizer)
 println("")
 display(indexer)
 println("")
-
-## Pipeline
-function clean(s::AbstractString)
-    s = lowercase(s)
-    s = Unicode.normalize(s, :NFD)
-    s = replace(s, r"['`’\u200d\p{M}]" => "") # contractions, zero width joiner and marks from normalization
-    s = replace(s, r"\n" => " ")
-end
-
-function preprocess(document, tokenizer; pattern = r"[A-Za-z][A-Za-z]+\b", max_length::Union{Nothing, Int}=nothing)
-    document = clean(document)
-    words = map(m->string(m.match), eachmatch(pattern, document))
-    tokens = tokenizer(words)
-    if !isnothing(max_length)
-        if length(tokens) > max_length
-            tokens = tokens[1:max_length]
-        end
-    end
-    tokens
-end
 
 ## Tokens
 
@@ -103,6 +85,7 @@ train_data, val_data = split_validation(X_train, y_train; rng=MersenneTwister(hy
 
 println("train samples:      ", size(train_data[1]), " ", size(train_data[2]))
 println("validation samples: ", size(val_data[1]), " ", size(val_data[2]))
+println("")
 
 ## Model 
 dim_embedding = hyperparameters["dim_embedding"]
@@ -158,6 +141,7 @@ val_loss = batched_metric(loss, val_data_loader)
 
 @printf "val_acc=%.4f%% ; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
+println("")
 
 directory = "..\\outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
 mkdir(directory)
@@ -165,8 +149,14 @@ output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
 hyperparameter_path = joinpath(directory, "hyperparameters.json")
 
+open(hyperparameter_path, "w") do f
+    JSON.print(f, hyperparameters)
+end
+println("saved hyperparameters to $(hyperparameter_path).")
+println("")
+
 start_time = time_ns()
-history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=10)
+history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=n_epochs)
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9
@@ -174,7 +164,7 @@ println("done training")
 ## Save 
 
 model = model |> cpu
-if haspropery(tokenizer, :cache)
+if hasproperty(tokenizer, :cache)
     # empty cache
     tokenizer = similar(tokenizer)
 end
@@ -186,11 +176,9 @@ BSON.bson(
         :indexer=>indexer
     )
     )
-
-open(hyperparameter_path, "w") do f
-    JSON.print(f, hyperparameters)
-end
+println("saved model to $(output_path).")
 
 open(history_path,"w") do f
   JSON.print(f, history)
 end
+println("saved history to $(history_path).")
