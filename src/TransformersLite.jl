@@ -11,7 +11,7 @@ include("Embed/tokenizer.jl")
 include("Embed/embed.jl")
 include("Embed/position_encoding.jl")
 export IndexTokenizer, encode, decode
-export Embed, PositionEncoding, add_position_encoding
+export Embed, PositionEncoding
 
 include("batched_mul_4d.jl")
 include("mul4d.jl")
