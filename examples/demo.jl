@@ -10,7 +10,7 @@ using Unicode
 using Dates
 using StatsBase: mean
 
-using TokenizersLite
+#using TokenizersLite # Uncomment if using bpe or affixer tokenizers below
 using TransformersLite
 include("utilities.jl")
 include("training.jl")
@@ -28,7 +28,7 @@ println("")
 
 hyperparameters = Dict(
     "seed" => 2718,
-    "tokenizer" => "bpe",
+    "tokenizer" => "none", # options: none bpe affixes
     "nlabels" => 5,
     "pdrop" => 0.1,
     "dim_embedding" => 32
