@@ -1,3 +1,15 @@
+"""
+    IndexTokenizer(vocab::Vector{T}, unksym::T) where T
+
+Convert words/tokens to indices.
+
+Usage:
+```
+indexer = IndexTokenizer(["UNK","this","book","recommend","highly"], "[UNK]")
+indexer(["i","highly","recommend","this","book","by","brandon","sanderson"])
+# [1, 6, 5, 3, 4, 1, 1, 1]
+```
+"""
 struct IndexTokenizer{T}
     vocabulary::Vector{T}
     unksym::T
@@ -13,14 +25,12 @@ struct IndexTokenizer{T}
     end
 end
 
-
 Base.length(tokenizer::IndexTokenizer) = length(tokenizer.vocabulary)
 
 function Base.show(io::IO, tokenizer::IndexTokenizer) 
     T = eltype(tokenizer.vocabulary)
     print(io, "IndexTokenizer{$(T)}(length(vocabulary)=$(length(tokenizer)), unksym=$(tokenizer.unksym))")
 end
-
 
 """
     encode(tokenizer::IndexTokenizer, x)
@@ -57,7 +67,6 @@ decode(tokenizer::IndexTokenizer{T}, x::Int) where T = 0 <= x <= length(tokenize
 function decode(tokenizer::IndexTokenizer{T}, seq::Vector{Int}) where T
     map(x->decode(tokenizer, x), seq)
 end
-
 
 function decode(tokenizer::IndexTokenizer{T}, indices::AbstractMatrix{Int}) where T
     nrow, ncol = size(indices)
