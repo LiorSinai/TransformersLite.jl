@@ -18,7 +18,7 @@ include("mul4d.jl")
 export batched_mul, mul4d
 
 include("attention.jl")
-export MultiheadAttention, scaled_dot_attention
+export MultiheadAttention, scaled_dot_attention, multi_head_scaled_dot_attention
 
 include("aggregate_layer.jl")
 export MeanLayer, FlattenLayer

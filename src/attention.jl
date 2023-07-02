@@ -67,28 +67,30 @@ end
 function (mha::MultiheadAttention)(query::A1, key::A2, value::A3) where {
     T, A1 <: AbstractArray{T, 3}, A2 <: AbstractArray{T, 3}, A3 <: AbstractArray{T, 3}}
     # batch multiplication version. Input is dm × N × B
-    qs = size(query)
-    ks = size(key)
-    vs = size(value)
-
     #size(Q) == (dh*nhead, N, B)
     Q = mha.denseQ(query)
     K = mha.denseK(key)
     V = mha.denseV(value)
+    A = multi_head_scaled_dot_attention(mha.nhead, Q, K, V)
+    mha.denseO(A)
+end
 
+function multi_head_scaled_dot_attention(nhead::Int, Q::A1, K::A2, V::A3) where {
+    T, A1 <: AbstractArray{T, 3}, A2 <: AbstractArray{T, 3}, A3 <: AbstractArray{T, 3}}
+    qs = size(Q)
+    ks = size(K)
+    vs = size(V)
     dm = size(Q, 1)
-    dh = div(dm, mha.nhead)
+    dh = div(dm, nhead)
     #size(Q) == (dh*nhead, N, B) => (dh, nhead, N, B) => (dh, N, nhead, B)
-    Q = permutedims(reshape(Q, dh, mha.nhead, qs[2], qs[3]), [1, 3, 2, 4])
-    K = permutedims(reshape(K, dh, mha.nhead, ks[2], ks[3]), [1, 3, 2, 4])
-    V = permutedims(reshape(V, dh, mha.nhead, vs[2], vs[3]), [1, 3, 2, 4])
+    Q = permutedims(reshape(Q, dh, nhead, qs[2], qs[3]), [1, 3, 2, 4])
+    K = permutedims(reshape(K, dh, nhead, ks[2], ks[3]), [1, 3, 2, 4])
+    V = permutedims(reshape(V, dh, nhead, vs[2], vs[3]), [1, 3, 2, 4])
     #size(A) == (dh, N, nhead, B)
     A = scaled_dot_attention(Q, K, V)
     #size(A) == (dh, N, nhead, B) => (dh, nhead, N, B) => (dm, N, B)
     A = permutedims(A, [1, 3, 2, 4])
     A = reshape(A, dm, size(A, 3), size(A, 4))
-
-    mha.denseO(A)
 end
 
 function (mha::MultiheadAttention)(query::A1, key::A2, value::A3) where {
