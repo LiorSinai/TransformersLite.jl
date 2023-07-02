@@ -5,9 +5,9 @@ Convert words/tokens to indices.
 
 Usage:
 ```
-indexer = IndexTokenizer(["UNK","this","book","recommend","highly"], "[UNK]")
+indexer = IndexTokenizer(["this","book","recommend","highly"], "[UNK]")
 indexer(["i","highly","recommend","this","book","by","brandon","sanderson"])
-# [1, 6, 5, 3, 4, 1, 1, 1]
+# [1, 5, 4, 2, 3, 1, 1, 1]
 ```
 """
 struct IndexTokenizer{T}
