@@ -100,7 +100,7 @@ pdrop = hyperparameters["pdrop"]
 #     Dense(dim_embedding, 1),
 #     TransformersLite.FlattenLayer(),
 #     Dense(max_length, nlabels)
-#      )
+#     )
 model = TransformersLite.TransformerClassifier(
     Embed(dim_embedding, length(indexer)), 
     PositionEncoding(dim_embedding), 

@@ -4,9 +4,9 @@ using Flux: pullback
 
 @testset "mul4d" begin
     # Real
-    A = randn(7,5,3,4)
-    B = randn(5,7,3,4)
-    C = randn(7,6,3,4)
+    A = randn(7, 5, 3, 4)
+    B = randn(5, 7, 3, 4)
+    C = randn(7, 6, 3, 4)
     AT = PermutedDimsArray(A, (2, 1, 3, 4))
     BT = PermutedDimsArray(B, (2, 1, 3, 4))
 
@@ -23,9 +23,9 @@ end
 
 @testset "mul4d grad" begin
     # Real
-    A = randn(7,5,3,4)
-    B = randn(5,7,3,4)
-    C = randn(7,6,3,4)
+    A = randn(7, 5, 3, 4)
+    B = randn(5, 7, 3, 4)
+    C = randn(7, 6, 3, 4)
     AT = PermutedDimsArray(A, (2, 1, 3, 4))
     BT = PermutedDimsArray(B, (2, 1, 3, 4))
 
