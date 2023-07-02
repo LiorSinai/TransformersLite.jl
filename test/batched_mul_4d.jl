@@ -2,8 +2,6 @@ using Test
 using TransformersLite: batched_mul
 using Flux: pullback
 
-include("utils.jl")
-
 @testset "batched_mul 4d" begin
     # Real
     A = randn(7,5,3,4)
@@ -16,6 +14,11 @@ include("utils.jl")
     @test multiply_test(AT, BT, batched_mul(AT, BT))
     @test multiply_test(AT, C, batched_mul(AT, C))
     @test multiply_test(AT, A, batched_mul(AT, A))
+
+    # Integer
+    A = rand(-100:100, 2, 2, 3, 4)
+    B = rand(-100:100, 2, 2, 3, 4)
+    @test multiply_test(A, B, batched_mul(A, B))
 end
 
 @testset "batched_mul 4d grad" begin
@@ -31,6 +34,3 @@ end
     @test grad_test_analytical(batched_mul, AT, C, randn(5, 6, 3, 4))
     @test grad_test_analytical(batched_mul, AT, A, randn(5, 5, 3, 4))
 end
-
-
-

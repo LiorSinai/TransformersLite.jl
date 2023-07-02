@@ -8,7 +8,7 @@ function mul4d(A::AbstractArray{T, 4}, B::AbstractArray{T, 4}) where T
         message = "A has dimensions $(size(A)) but B has dimensions $(size(B))"
         throw(DimensionMismatch(message))
     end
-    C = Array{Float64, 4}(undef, size(A, 1), size(B, 2), size(A, 3), size(A, 4))
+    C = Array{T, 4}(undef, size(A, 1), size(B, 2), size(A, 3), size(A, 4))
     for l in 1:size(A, 4)
         for k in 1:size(A, 3)
             C[:, :, k, l] = A[:, :, k, l] * B[:, :, k, l]

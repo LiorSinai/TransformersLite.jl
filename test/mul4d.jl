@@ -2,8 +2,6 @@ using Test
 using TransformersLite: mul4d
 using Flux: pullback
 
-include("utils.jl")
-
 @testset "mul4d" begin
     # Real
     A = randn(7,5,3,4)
@@ -16,6 +14,11 @@ include("utils.jl")
     @test multiply_test(AT, BT, mul4d(AT, BT))
     @test multiply_test(AT, C, mul4d(AT, C))
     @test multiply_test(AT, A, mul4d(AT, A))
+
+    # Integer
+    A = rand(-100:100, 2, 2, 3, 4)
+    B = rand(-100:100, 2, 2, 3, 4)
+    @test multiply_test(A, B, mul4d(A, B))
 end
 
 @testset "mul4d grad" begin
@@ -31,4 +34,3 @@ end
     @test grad_test_analytical(mul4d, AT, C, randn(5, 6, 3, 4))
     @test grad_test_analytical(mul4d, AT, A, randn(5, 5, 3, 4))
 end
-
