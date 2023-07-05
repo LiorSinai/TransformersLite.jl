@@ -34,7 +34,7 @@ function make_position_encoding(dim_embedding::Int, seq_length::Int, n::Int=1000
 end
 
 (pe::PositionEncoding)(x::AbstractArray) = (pe::PositionEncoding)(size(x, 2))
-function (pe::PositionEncoding)(seq_length)
+function (pe::PositionEncoding)(seq_length::Int)
     max_length = size(pe.encoding, 2)
     if seq_length > max_length
         error("sequence length of $seq_length exceeds maximum position encoding length of $max_length")
