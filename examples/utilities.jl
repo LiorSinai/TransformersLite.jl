@@ -15,7 +15,7 @@ end
 
 #### Preprocessing text
 
-function clean(s::AbstractString)
+function simplify(s::AbstractString)
     s = lowercase(s)
     s = Unicode.normalize(s, :NFD)
     s = replace(s, r"['`’\u200d\p{M}]" => "") # contractions, zero width joiner and marks from normalization
@@ -23,7 +23,7 @@ function clean(s::AbstractString)
 end
 
 function preprocess(document::AbstractString, tokenizer; pattern::Regex = r"[A-Za-z][A-Za-z]+\b", max_length::Union{Nothing, Int}=nothing)
-    document = clean(document)
+    document = simplify(document)
     words = map(m->string(m.match), eachmatch(pattern, document))
     tokens = tokenizer(words)
     if !isnothing(max_length)
