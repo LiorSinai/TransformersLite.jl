@@ -19,8 +19,8 @@ path = "datasets\\amazon_reviews_multi\\en\\1.0.0\\"
 filename = "amazon_reviews_multi-train.arrow"
 to_device = gpu # gpu or cpu
 
-checksum = readdir(path)[1]
-filepath = joinpath(path, checksum, filename)
+fingerprint = readdir(path)[1]
+filepath = joinpath(path, fingerprint, filename)
 
 df = DataFrame(Arrow.Table(filepath))
 display(first(df, 20))
