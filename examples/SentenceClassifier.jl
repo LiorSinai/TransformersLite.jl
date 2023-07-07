@@ -37,6 +37,6 @@ end
 
 function parabolic_weighted_average(x)
     # weights negative and positive values more than neutral values
-    w = (x .-0.5) .^2
+    w = (x .- 0.5) .^2
     sum(x .* w ./ sum(w))
 end

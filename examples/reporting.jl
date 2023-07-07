@@ -66,6 +66,6 @@ function classification_report(cm::AbstractMatrix, labels=1:size(cm, 1))
     weighted["recall"] /= weighted["support"]
     weighted["f1"] /= weighted["support"]
     @printf("%12s  %9.2f  %6.2f  %8.2f  %7d", 
-            "weighted avg", weighted["precision"], weighted["recall"], weighted["f1"], weighted["support"]
-        )
+        "weighted avg", weighted["precision"], weighted["recall"], weighted["f1"], weighted["support"]
+    )
 end
