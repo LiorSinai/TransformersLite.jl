@@ -142,7 +142,7 @@ val_loss = batched_metric(loss, val_data_loader; g=model)
 @printf "val_loss=%.4f \n" val_loss
 println("")
 
-directory = normpath(joinpath(@__DIR__, "..", "outputs", Dates.format(now(), "yyyymmdd_HHMM")))
+directory = normpath( joinpath(@__DIR__, "..", "outputs", Dates.format(now(), "yyyymmdd_HHMM")))
 mkpath(directory)
 output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
