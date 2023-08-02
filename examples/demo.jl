@@ -1,4 +1,3 @@
-using Flux.CUDA
 using Random
 using DataFrames
 using Arrow
@@ -15,7 +14,7 @@ using TransformersLite
 include("utilities.jl")
 include("training.jl")
 
-path = "datasets\\amazon_reviews_multi\\en\\1.0.0\\"
+path = joinpath(@__DIR__, "..", "datasets", "amazon_reviews_multi", "en", "1.0.0")
 filename = "amazon_reviews_multi-train.arrow"
 to_device = gpu # gpu or cpu
 
@@ -39,12 +38,12 @@ n_epochs = 10
 ## Tokenizers
 
 if hyperparameters["tokenizer"] == "bpe"
-    directory = "vocab\\bpe"
+    directory = joinpath("vocab", "bpe")
     path_rules = joinpath(directory, "amazon_reviews_train_en_rules.txt")
     path_vocab = joinpath(directory, "amazon_reviews_train_en_vocab.txt")
     tokenizer = load_bpe(path_rules, startsym="⋅")
 elseif hyperparameters["tokenizer"] == "affixes"
-    directory = "vocab\\affixes"
+    directory = joinpath("vocab","affixes")
     path_vocab = joinpath(directory, "amazon_reviews_train_en_vocab.txt")
     tokenizer = load_affix_tokenizer(path_vocab)
 elseif hyperparameters["tokenizer"] == "none"
@@ -52,7 +51,7 @@ elseif hyperparameters["tokenizer"] == "none"
     tokenizer = identity
 end
 
-vocab = load_vocab(path_vocab)
+vocab = load_vocab(joinpath(@__DIR__, path_vocab))
 indexer = IndexTokenizer(vocab, "[UNK]")
 
 display(tokenizer)
@@ -65,7 +64,7 @@ println("")
 documents = df[!, :review_body]
 labels = df[!, :stars]
 max_length = 50
-indices_path = "outputs/indices_" * hyperparameters["tokenizer"] * ".bson"
+indices_path = joinpath(@__DIR__, "outputs", "indices_" * hyperparameters["tokenizer"] * ".bson")
 @time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents)
 @time indices = indexer(tokens)
 
@@ -120,31 +119,31 @@ hyperparameters["model"] = "$(typeof(model).name.wrapper)"
 hyperparameters["trainable parameters"] = sum(length, Flux.params(model));
 
 if nlabels == 1
-    loss(x, y) = Flux.logitbinarycrossentropy(model(x), y)
+    loss(x, y) = Flux.logitbinarycrossentropy(x, y)
     accuracy(ŷ, y) = mean((Flux.sigmoid.(ŷ) .> 0.5) .== y)
 else
-    loss(x, y) = Flux.logitcrossentropy(model(x), y)
+    loss(x, y) = Flux.logitcrossentropy(x, y)
     accuracy(ŷ, y) = mean(Flux.onecold(ŷ) .== Flux.onecold(y))
 end
 
-loss(x::Tuple) = loss(x[1], x[2])
+
 
 ## Training 
-opt = ADAM()
+opt = Flux.setup(Flux.Adam(), model)
 
 batch_size = 32
 train_data_loader = DataLoader(train_data |> to_device; batchsize=batch_size, shuffle=true)
 val_data_loader = DataLoader(val_data |> to_device; batchsize=batch_size, shuffle=false)
 
 val_acc = batched_metric(accuracy, val_data_loader; g=model)
-val_loss = batched_metric(loss, val_data_loader)
+val_loss = batched_metric(loss, val_data_loader; g=model)
 
 @printf "val_acc=%.4f%% ; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
 println("")
 
-directory = "..\\outputs\\" * Dates.format(now(), "yyyymmdd_HHMM")
-mkdir(directory)
+directory = normpath(joinpath(@__DIR__, "..", "outputs", Dates.format(now(), "yyyymmdd_HHMM")))
+mkpath(directory)
 output_path = joinpath(directory, "model.bson")
 history_path = joinpath(directory, "history.json")
 hyperparameter_path = joinpath(directory, "hyperparameters.json")
@@ -156,7 +155,7 @@ println("saved hyperparameters to $(hyperparameter_path).")
 println("")
 
 start_time = time_ns()
-history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=n_epochs)
+history = train!(loss, model, train_data_loader, opt, val_data_loader; n_epochs=n_epochs)
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9
