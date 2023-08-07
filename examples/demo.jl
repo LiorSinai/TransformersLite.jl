@@ -1,3 +1,4 @@
+using CUDA
 using Random
 using DataFrames
 using Arrow
@@ -14,7 +15,7 @@ using TransformersLite
 include("utilities.jl")
 include("training.jl")
 
-path = joinpath(@__DIR__, "..", "datasets", "amazon_reviews_multi", "en", "1.0.0")
+path = normpath(joinpath(@__DIR__, "..", "datasets", "amazon_reviews_multi", "en", "1.0.0"))
 filename = "amazon_reviews_multi-train.arrow"
 to_device = gpu # gpu or cpu
 
@@ -89,8 +90,8 @@ println("")
 ## Model 
 dim_embedding = hyperparameters["dim_embedding"]
 pdrop = hyperparameters["pdrop"]
-# position_encoding = PositionEncoding(dim_embedding) |> to_device
-# add_position_encoding(x) = x .+ position_encoding(x)
+position_encoding = PositionEncoding(dim_embedding) |> to_device
+add_position_encoding(x) = x .+ position_encoding(x)
 # model = Chain(
 #     Embed(dim_embedding, length(indexer)), 
 #     add_position_encoding, 
