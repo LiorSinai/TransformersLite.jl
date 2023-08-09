@@ -90,8 +90,8 @@ println("")
 ## Model 
 dim_embedding = hyperparameters["dim_embedding"]
 pdrop = hyperparameters["pdrop"]
-position_encoding = PositionEncoding(dim_embedding) |> to_device
-add_position_encoding(x) = x .+ position_encoding(x)
+# position_encoding = PositionEncoding(dim_embedding) |> to_device
+# add_position_encoding(x) = x .+ position_encoding(x)
 # model = Chain(
 #     Embed(dim_embedding, length(indexer)), 
 #     add_position_encoding, 
@@ -130,7 +130,7 @@ end
 
 
 ## Training 
-opt = Flux.setup(Flux.Adam(), model)
+opt_state = Flux.setup(Flux.Adam(), model)
 
 batch_size = 32
 train_data_loader = DataLoader(train_data |> to_device; batchsize=batch_size, shuffle=true)
@@ -156,7 +156,7 @@ println("saved hyperparameters to $(hyperparameter_path).")
 println("")
 
 start_time = time_ns()
-history = train!(loss, model, train_data_loader, opt, val_data_loader; n_epochs=n_epochs)
+history = train!(loss, model, train_data_loader, opt_state, val_data_loader; n_epochs=n_epochs)
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9
