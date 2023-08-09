@@ -48,7 +48,7 @@ function split_validation(X::AbstractVector, Y::AbstractVector, frac=0.1; rng=Ra
     (X[idxs[1:ntrain]], Y[idxs[1:ntrain]]), (X[idxs[ntrain+1:end]], Y[idxs[ntrain+1:end]])
 end
 
-function train!(loss, model, train_data, opt, val_data; n_epochs=10)
+function train!(loss, model, train_data, opt_state, val_data; n_epochs=10)
     history = Dict(
         "train_acc"=>Float64[], 
         "train_loss"=>Float64[], 
@@ -57,13 +57,14 @@ function train!(loss, model, train_data, opt, val_data; n_epochs=10)
         )
     for epoch in 1:n_epochs
         progress = Progress(length(train_data); desc="epoch $epoch/$n_epochs")
-        epoch_loss = 0.0
-        for Xy in train_data
-            grads = Flux.gradient(model) do m
+        total_loss = 0.0    
+        for (i, Xy) in enumerate(train_data)
+            batch_loss, grads = Flux.withgradient(model) do m
                 loss(m(Xy[1]), Xy[2])
             end
-            Flux.update!(opt, model, grads[1])
-            ProgressMeter.next!(progress)
+            Flux.update!(opt_state, model, grads[1])
+            total_loss += batch_loss
+            ProgressMeter.next!(progress; showvalues=[(:mean_loss, total_loss / i), (:batch_loss, batch_loss)])
         end
         update_history!(history, model, loss, train_data, val_data)
     end
