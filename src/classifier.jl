@@ -18,6 +18,8 @@ end
 
 Flux.@functor TransformerClassifier
 
+Flux._childarray_sum(f::Function, x::FlattenLayer) = 0
+
 function Base.show(io::IO, m::MIME"text/plain", t::TransformerClassifier)
     _show_transformer_classifier(io, t)
 end
