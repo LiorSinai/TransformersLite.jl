@@ -1,4 +1,4 @@
-using CUDA
+using Flux.CUDA
 using Random
 using DataFrames
 using Arrow
