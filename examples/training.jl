@@ -64,7 +64,7 @@ function train!(loss, model, train_data, opt_state, val_data; n_epochs=10)
             end
             Flux.update!(opt_state, model, grads[1])
             total_loss += batch_loss
-            ProgressMeter.next!(progress; showvalues=[(:mean_loss, total_loss / i), (:batch_loss, batch_loss)])
+            ProgressMeter.next!(progress; showvalues = [(:mean_loss, total_loss / i), (:batch_loss, batch_loss)])
         end
         update_history!(history, model, loss, train_data, val_data)
     end
