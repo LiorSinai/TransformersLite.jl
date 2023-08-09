@@ -1,4 +1,5 @@
 using Flux.CUDA
+using Optimisers
 using Random
 using DataFrames
 using Arrow
@@ -127,10 +128,8 @@ else
     accuracy(ŷ, y) = mean(Flux.onecold(ŷ) .== Flux.onecold(y))
 end
 
-
-
-## Training 
-opt_state = Flux.setup(Flux.Adam(), model)
+## Training (we use Optimisers instead of Flux due to bug in Flux below v0.13.11)
+opt_state = Optimisers.setup(Optimisers.Adam(), model)
 
 batch_size = 32
 train_data_loader = DataLoader(train_data |> to_device; batchsize=batch_size, shuffle=true)
