@@ -37,3 +37,5 @@ end
 function Base.show(io::IO, f::FlattenLayer)
   print(io, "FlattenLayer()")
 end
+
+Flux._childarray_sum(f::Function, x::FlattenLayer) = 0
