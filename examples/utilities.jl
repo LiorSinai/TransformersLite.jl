@@ -1,7 +1,26 @@
-using Flux: DataLoader
 using Unicode
+using DataStructures
 
 ### Tokenizer
+
+function select_vocabulary(corpus::AbstractVector{<:AbstractString}; 
+    min_document_frequency::Int=10, pattern::Regex=r"[A-Za-z][A-Za-z]+\b")
+    document_frequencies = DefaultDict{String, Int}(0)
+    for document in corpus
+        words = Set{String}()
+        for m in eachmatch(pattern, simplify(document))
+            word = m.match
+            if !(word in words)
+                push!(words, word)
+                document_frequencies[word] += 1
+            end
+        end
+    end
+    filter!(x->x[2] ≥ min_document_frequency, document_frequencies)
+    vocab = collect(document_frequencies)
+    sort!(vocab, by=x->x[2], rev=true)
+    [v[1] for v in vocab]
+end
 
 function load_vocab(filepath::AbstractString)
     vocab = String[]
