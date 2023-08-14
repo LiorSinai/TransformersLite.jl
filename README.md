@@ -47,9 +47,8 @@ However any compatible tokenizer can be used.
 To run the examples:
 ```bash
 mkdir outputs
-cd examples
-python download_amazon_reviews.py
-julia demo.jl --threads auto
+python examples/download_amazon_reviews.py
+julia examples/demo.jl --threads auto
 ### after training completes
 jupyter notebook
 ```

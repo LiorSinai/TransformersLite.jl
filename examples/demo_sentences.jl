@@ -14,7 +14,7 @@ include("utilities.jl")
 include("training.jl")
 include("SentenceClassifier.jl")
 
-path = "datasets\\amazon_reviews_multi\\en\\1.0.0\\"
+path = normpath(joinpath(@__DIR__, "..", "datasets", "amazon_reviews_multi", "en", "1.0.0"))
 filename = "amazon_reviews_multi-train.arrow"
 file_test = "amazon_reviews_multi-test.arrow" ;
 
@@ -108,15 +108,15 @@ loss(x::Tuple) = loss(x[1], x[2])
 accuracy(ŷ, y) = mean((ŷ .> 0.5) .== y)
 
 ## Training 
-opt = ADAM()
+opt_state = Flux.setup(Adam(), model)
 
 batch_size = 32
 
 train_data_loader = DataLoader(train_data; batchsize=batch_size, shuffle=true)
 val_data_loader = DataLoader(val_data; batchsize=batch_size, shuffle=false)
 
-val_acc = batched_metric(accuracy, val_data_loader; g=model)
-val_loss = batched_metric(loss, val_data_loader)
+val_acc = batched_metric(model, accuracy, val_data_loader)
+val_loss = batched_metric(model, loss, val_data_loader)
 
 @printf "val_acc=%.4f%%; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
@@ -135,7 +135,10 @@ println("saved hyperparameters to $(hyperparameter_path).")
 println("")
 
 start_time = time_ns()
-history = train!(loss, Flux.params(model), train_data_loader, opt, val_data_loader; n_epochs=10)
+history = train!(
+    loss, model, train_data_loader, opt_state, val_data_loader
+    ; num_epochs=10
+    )
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9

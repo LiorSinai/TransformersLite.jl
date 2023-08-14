@@ -1,11 +1,10 @@
-using Flux.CUDA
-using Optimisers
 using Random
 using DataFrames
 using Arrow
 using Printf
 using BSON, JSON
 using Flux
+using Flux.CUDA
 using Flux: DataLoader
 using Unicode
 using Dates
@@ -82,7 +81,8 @@ else
 end
 
 X_train, y_train = indices[:, idxs], y_labels[:, idxs];
-train_data, val_data = split_validation(X_train, y_train; rng=MersenneTwister(hyperparameters["seed"]))
+rng = MersenneTwister(hyperparameters["seed"])
+train_data, val_data = split_validation(rng, X_train, y_train)
 
 println("train samples:      ", size(train_data[1]), " ", size(train_data[2]))
 println("validation samples: ", size(val_data[1]), " ", size(val_data[2]))
@@ -128,15 +128,15 @@ else
     accuracy(ŷ, y) = mean(Flux.onecold(ŷ) .== Flux.onecold(y))
 end
 
-## Training (we use Optimisers instead of Flux due to bug in Flux below v0.13.11)
-opt_state = Optimisers.setup(Optimisers.Adam(), model)
+## Training
+opt_state = Flux.setup(Adam(), model)
 
 batch_size = 32
 train_data_loader = DataLoader(train_data |> to_device; batchsize=batch_size, shuffle=true)
 val_data_loader = DataLoader(val_data |> to_device; batchsize=batch_size, shuffle=false)
 
-val_acc = batched_metric(accuracy, val_data_loader; g=model)
-val_loss = batched_metric(loss, val_data_loader; g=model)
+val_acc = batched_metric(model, accuracy, val_data_loader)
+val_loss = batched_metric(model, loss, val_data_loader)
 
 @printf "val_acc=%.4f%% ; " val_acc * 100
 @printf "val_loss=%.4f \n" val_loss
@@ -155,7 +155,9 @@ println("saved hyperparameters to $(hyperparameter_path).")
 println("")
 
 start_time = time_ns()
-history = train!(loss, model, train_data_loader, opt_state, val_data_loader; n_epochs=n_epochs)
+history = train!(
+    loss, model, train_data_loader, opt_state, val_data_loader
+    ; num_epochs=n_epochs)
 end_time = time_ns() - start_time
 println("done training")
 @printf "time taken: %.2fs\n" end_time/1e9
