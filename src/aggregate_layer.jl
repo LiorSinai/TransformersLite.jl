@@ -3,7 +3,7 @@
 
 Reduce to the mean along dims=1.
 
-Compare Flux.GlobalMeanPool()
+Compare `Flux.GlobalMeanPool()`.
 """
 struct MeanLayer end
 
@@ -18,7 +18,7 @@ function Base.show(io::IO, m::MeanLayer)
 end
 
 """
-FlattenLayer(x)
+  FlattenLayer(x)
 
 Return a matrix of nlayers × nbatch.
 """
