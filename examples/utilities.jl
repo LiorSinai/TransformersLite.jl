@@ -4,11 +4,11 @@ using DataStructures
 ### Tokenizer
 
 function select_vocabulary(corpus::AbstractVector{<:AbstractString}; 
-    min_document_frequency::Int=10, pattern::Regex=r"[A-Za-z][A-Za-z]+\b")
+    min_document_frequency::Int=10, pattern::Regex=r"\w\w+\b", transform=simplify)
     document_frequencies = DefaultDict{String, Int}(0)
     for document in corpus
         words = Set{String}()
-        for m in eachmatch(pattern, simplify(document))
+        for m in eachmatch(pattern, transform(document))
             word = m.match
             if !(word in words)
                 push!(words, word)
@@ -41,9 +41,10 @@ function simplify(s::AbstractString)
     s = replace(s, r"\n" => " ")
 end
 
-function preprocess(document::AbstractString, tokenizer; pattern::Regex = r"[A-Za-z][A-Za-z]+\b", max_length::Union{Nothing, Int}=nothing)
-    document = simplify(document)
-    words = map(m->string(m.match), eachmatch(pattern, document))
+function preprocess(document::AbstractString, tokenizer;
+    pattern::Regex = r"\w\w+\b", max_length::Union{Nothing, Int}=nothing, transform=simplify
+    )
+    words = map(m->string(m.match), eachmatch(pattern, transform(document)))
     tokens = tokenizer(words)
     if !isnothing(max_length)
         if length(tokens) > max_length
