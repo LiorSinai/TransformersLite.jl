@@ -48,7 +48,7 @@ To run the examples:
 ```bash
 mkdir outputs
 python examples/download_amazon_reviews.py
-julia examples/demo.jl --threads auto
+julia --threads auto --project="." examples\\demo.jl
 ### after training completes
 jupyter notebook
 ```
@@ -96,16 +96,25 @@ However the distributions do have a spread and have significant overlaps of conf
 ## Installation
 
 Download the GitHub repository (it is not registered). Then in the Julia REPL:
-```
+```Julia
 julia> ] # enter package mode
-(@v1.x) pkg> dev path\\to\\TransformersLite
+(@v1.x) pkg> dev path\\to\\TransformersLite.jl
 julia> using Revise # for dynamic editing of code
 julia> using TransformersLite
 ```
 
-Done. 
+To install dependencies, navigate to the TransformersLite directory. Then in the Julia REPL:
+```Julia
+julia> ] # enter package mode
+(@v1.x) pkg> activate .
+(TransformersLite) instantiate 
+```
+Dependencies can also be installed manually in the main Julia environment.
 
-### Dependencies
+The cuDNN library needs to installed separately for CUDA GPU functionality.
+It is added as an artifact via the cuDNN package.
+
+### Non-Julia Dependencies
 
 Other than Julia this requires Python for:
 - HuggingFace datasets package. 

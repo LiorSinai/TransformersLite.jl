@@ -4,7 +4,7 @@ using Arrow
 using Printf
 using BSON, JSON
 using Flux
-using Flux.CUDA
+using CUDA, cuDNN
 using Flux: DataLoader
 using Unicode
 using Dates
@@ -52,7 +52,9 @@ elseif hyperparameters["tokenizer"] == "none"
     tokenizer = identity
 end
 
-vocab = load_vocab(joinpath(@__DIR__, path_vocab))
+#vocab = load_vocab(joinpath(@__DIR__, path_vocab))
+corpus = String.(df[!, :review_body])
+vocab = select_vocabulary(corpus; min_document_frequency=30)
 indexer = IndexTokenizer(vocab, "[UNK]")
 
 display(tokenizer)
@@ -66,7 +68,7 @@ documents = df[!, :review_body]
 labels = df[!, :stars]
 max_length = 50
 indices_path = joinpath(@__DIR__, "outputs", "indices_" * hyperparameters["tokenizer"] * ".bson")
-@time tokens = map(d->preprocess(d, tokenizer, max_length=max_length), documents)
+@time tokens = map(d->preprocess(d, tokenizer; max_length=max_length), documents)
 @time indices = indexer(tokens)
 
 y_labels = Int.(labels)
