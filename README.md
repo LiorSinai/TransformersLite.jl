@@ -110,6 +110,9 @@ X = gpu(X)   # 10×8 CuArray{Int64, 2, CUDA.Mem.DeviceBuffer}
 Y = model(X) # 3×8 CuArray{Float32, 2, CUDA.Mem.DeviceBuffer}
 ```
 
+More extensive examples were part of this repository.
+They have since been moved to [github.com/LiorSinai/TransformersLite-Examples](https://github.com/LiorSinai/TransformersLite-Examples).
+
 ## Installation
 
 Download the GitHub repository (it is not registered). Then in the Julia REPL:
