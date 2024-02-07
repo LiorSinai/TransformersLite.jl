@@ -38,8 +38,8 @@ end
     AT = PermutedDimsArray(A, (2, 1, 3, 4))
     BT = PermutedDimsArray(B, (2, 1, 3, 4))
 
-    @test grad_test_analytical(batched_mul, A, B, randn(7, 7, 3, 4))
-    @test grad_test_analytical(batched_mul, AT, BT, randn(5, 5, 3, 4))
-    @test grad_test_analytical(batched_mul, AT, C, randn(5, 6, 3, 4))
-    @test grad_test_analytical(batched_mul, AT, A, randn(5, 5, 3, 4))
+    @test grad_test(batched_mul, A, B, randn(7, 7, 3, 4))
+    @test grad_test(batched_mul, AT, BT, randn(5, 5, 3, 4))
+    @test grad_test(batched_mul, AT, C, randn(5, 6, 3, 4))
+    @test grad_test(batched_mul, AT, A, randn(5, 5, 3, 4))
 end
