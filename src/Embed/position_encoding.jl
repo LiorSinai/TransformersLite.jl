@@ -39,7 +39,7 @@ function (pe::PositionEncoding)(seq_length::Int)
     if seq_length > max_length
         error("sequence length of $seq_length exceeds maximum position encoding length of $max_length")
     end
-    pe.encoding[:, Base.OneTo(seq_length)]
+    view(pe.encoding, :, Base.OneTo(seq_length))
 end
 
 function Base.show(io::IO, pe::PositionEncoding)
