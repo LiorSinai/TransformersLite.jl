@@ -10,7 +10,7 @@ For each a pair of rows `(2i, 2i+1)` and a position `k`, the encoding is calcula
 
 """
 struct PositionEncoding{W <: AbstractArray}
-    encoding::W
+    weight::W
 end
 
 Flux.@functor PositionEncoding
@@ -35,13 +35,13 @@ end
 
 (pe::PositionEncoding)(x::AbstractArray) = (pe::PositionEncoding)(size(x, 2))
 function (pe::PositionEncoding)(seq_length::Int)
-    max_length = size(pe.encoding, 2)
+    max_length = size(pe.weight, 2)
     if seq_length > max_length
         error("sequence length of $seq_length exceeds maximum position encoding length of $max_length")
     end
-    view(pe.encoding, :, Base.OneTo(seq_length))
+    view(pe.weight, :, Base.OneTo(seq_length))
 end
 
 function Base.show(io::IO, pe::PositionEncoding)
-    print(io, "PositionEncoding($(size(pe.encoding, 1)))")
+    print(io, "PositionEncoding($(size(pe.weight, 1)))")
 end
