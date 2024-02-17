@@ -15,6 +15,7 @@ Two implementations are provided for the 4D batch multiplication such that `A×B
 These are `mul4d` and an extension to NNlib's `batched_mul`. The extension to `batched_mul` is about 1.5× faster than `mul4d`.
 
 ## Examples
+### Classifier
 
 Create a model with `Flux.chain`:
 ```julia
@@ -25,8 +26,8 @@ model = Chain(
     Embed(32, 1000), # vocab length is 1000
     add_position_encoding, # can also make anonymous
     Dropout(0.1),
-    TransformerEncoderBlock(4, 32, 32 * 4; pdrop=0.1),
-    TransformerEncoderBlock(4, 32, 32 * 4; pdrop=0.1),
+    TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
+    TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
     Dense(32, 1),
     FlattenLayer(),
     Dense(10, 3) # sentence length is 10, 3 labels
@@ -40,9 +41,9 @@ model = TransformersLite.TransformerClassifier(
     Embed(32, 1000), # vocab length is 1000
     PositionEncoding(32), 
     Dropout(0.1),
-    TransformerEncoderBlock[
-        TransformerEncoderBlock(4, 32, 32 * 4; pdrop=0.1),
-        TransformerEncoderBlock(4, 32, 32 * 4; pdrop=0.1)
+    TransformerBlock[
+        TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
+        TransformerBlock(4, 32, 32 * 4; pdrop=0.1)
     ],
     Dense(32, 1), 
     FlattenLayer(),
@@ -56,12 +57,13 @@ TransformerClassifier(
   Embed((32, 1000)),                    # 32_000 parameters
   PositionEncoding(32),
   Dropout(0.1),
-  TransformerEncoderBlock(
-    MultiheadAttention(num_heads=4, head_size=8, 32=>32)(
-      denseQ = Dense(32 => 32),         # 1_056 parameters
-      denseK = Dense(32 => 32),         # 1_056 parameters
-      denseV = Dense(32 => 32),         # 1_056 parameters
+  TransformerBlock(
+    MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
+      denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
+      mask = nothing,
     ),
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
@@ -70,12 +72,13 @@ TransformerClassifier(
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
   ),
-  TransformerEncoderBlock(
-    MultiheadAttention(num_heads=4, head_size=8, 32=>32)(
-      denseQ = Dense(32 => 32),         # 1_056 parameters
-      denseK = Dense(32 => 32),         # 1_056 parameters
-      denseV = Dense(32 => 32),         # 1_056 parameters
+  TransformerBlock(
+    MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
+      denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
+      mask = nothing,
     ),
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
@@ -87,25 +90,27 @@ TransformerClassifier(
   Dense(32 => 1),                       # 33 parameters
   FlattenLayer(),
   Dense(10 => 3),                       # 33 parameters
-)        # Total: 37 trainable arrays, 57_474 parameters,
-         # plus 1 non-trainable, 32_000 parameters, summarysize 352.125 KiB
+)        # Total: 31 trainable arrays, 57_282 parameters,
+          # plus 1 non-trainable, 32_000 parameters, summarysize 351.141 KiB.
 ```
 
 Usage:
 ```julia
+vocab_size = 1000
 sentence_length = size(model.classifier.weight, 2)
-x = rand(1:1000, sentence_length)
+x = rand(1:vocab_size, sentence_length) 
 y = model(x) # 3×1 Matrix{Float32}
 
 batch_size = 8
-X = rand(1:1000, sentence_length, batch_size)
+X = rand(1:vocab_size, sentence_length, batch_size)
 Y = model(X) # 3×8 Matrix{Float32}
 ```
 
-GPU support:
+### GPU support
+
 ```julia
 using CUDA, cuDNN # As of Julia 1.9, these must be loaded separately to FLux
-model = gpu(model) 
+model = gpu(model) # using the classifier above
 X = gpu(X)   # 10×8 CuArray{Int64, 2, CUDA.Mem.DeviceBuffer}
 Y = model(X) # 3×8 CuArray{Float32, 2, CUDA.Mem.DeviceBuffer}
 ```
