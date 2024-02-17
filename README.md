@@ -8,7 +8,7 @@ This package is designed to work with [Flux](https://github.com/FluxML/Flux.jl).
 It comes with the following layers:
 - `Indexer`: map tokens to indices.
 - `Embed`: and embedding layer, similar to `Flux.Embedding`.
-- `PositionEncoding`: implements a fix sinusodial layer as described in [Attention is all you need](https://arxiv.org/abs/1706.03762) paper.
+- `PositionEncoding`: a fixed sinusodial layer as described in [Attention is all you need](https://arxiv.org/abs/1706.03762) paper.
 - `MultiHeadAttention`: similar to but differs from `Flux.MultiHeadAttention`.
 - `MeanLayer`
 - `FlattenLayer`
@@ -24,7 +24,7 @@ These layers can be used together with `Flux.Chain`. For convenience, the follow
 ## Examples
 ### Classifier
 
-Create a model with `Flux.chain`:
+Create a model with `Flux.Chain`:
 ```julia
 using TransformersLite, Flux
 position_encoding = PositionEncoding(32)
@@ -104,7 +104,7 @@ TransformerClassifier(
 Usage:
 ```julia
 vocab_size = 1000
-sentence_length = size(model.classifier.weight, 2)
+sentence_length = size(model.head.weight, 2)
 x = rand(1:vocab_size, sentence_length) 
 y = model(x) # 3×1 Matrix{Float32}
 

@@ -13,7 +13,7 @@ struct TransformerClassifier{
     blocks::TB
     agg_layer::A
     flatten_layer::f
-    classifier::D
+    head::D
 end
 
 Flux.@functor TransformerClassifier
@@ -27,7 +27,7 @@ function (t::TransformerClassifier)(x::A) where {A<:AbstractArray}
     end
     x = t.agg_layer(x)              # (1, N, B)
     x = t.flatten_layer(x)          # (N, B)
-    x = t.classifier(x)             # (n_labels, B)
+    x = t.head(x)             # (n_labels, B)
     x
 end
 
@@ -37,7 +37,7 @@ function Base.show(io::IO, m::MIME"text/plain", t::TransformerClassifier)
     _show_transformer_classifier(io, t)
 end
 
-function _show_transformer_classifier(io::IO, t::TransformerClassifier; indent::Int=0)
+function _show_transformer_classifier(io::IO, t::TransformerClassifier, indent::Int=0)
     inner_indent = indent + 2
     print(io, " "^indent, "TransformerClassifier(\n")
     for layer in [
@@ -47,7 +47,7 @@ function _show_transformer_classifier(io::IO, t::TransformerClassifier; indent::
         t.blocks...,
         t.agg_layer,
         t.flatten_layer,
-        t.classifier
+        t.head
         ]
         if typeof(layer) <: TransformerBlock
             _show_transformer_block(io, layer, inner_indent)
