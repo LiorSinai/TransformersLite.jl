@@ -2,7 +2,9 @@ using Test
 using TransformersLite: batched_mul
 using Flux: pullback
 
-@testset "batched_mul 4d" begin
+@testset "batched_mul 4d" verbose=true begin
+
+@testset "forward" begin
     # Integer
     A = rand(-100:100, 2, 2, 3, 4)
     B = rand(-100:100, 2, 2, 3, 4)
@@ -30,7 +32,7 @@ using Flux: pullback
     @test_throws DimensionMismatch batched_mul(A, B)
 end
 
-@testset "batched_mul 4d grad" begin
+@testset "grad" begin
     # Real
     A = randn(7, 5, 3, 4)
     B = randn(5, 7, 3, 4)
@@ -42,4 +44,6 @@ end
     @test grad_test(batched_mul, AT, BT, randn(5, 5, 3, 4))
     @test grad_test(batched_mul, AT, C, randn(5, 6, 3, 4))
     @test grad_test(batched_mul, AT, A, randn(5, 5, 3, 4))
+end
+
 end
