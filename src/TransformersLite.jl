@@ -15,6 +15,7 @@ include("attention.jl")
 include("batched_mul_4d.jl")
 include("mask.jl")
 include("mul4d.jl")
+include("tail.jl")
 export batched_mul, mul4d
 export scaled_dot_attention, multi_head_scaled_dot_attention
 
@@ -36,5 +37,7 @@ export TransformerBlock
 
 ## Models
 include("models/TransformerClassifier.jl")
+include("models/TransformerGenerator.jl")
+export generate
 
 end

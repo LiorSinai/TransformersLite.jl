@@ -10,4 +10,5 @@ using TransformersLite
     include("MultiHeadAttention.jl")
     include("block.jl")
     include("classifier.jl")
+    include("generator.jl")
 end
