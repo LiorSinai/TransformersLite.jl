@@ -12,6 +12,7 @@ indexer(["i","highly","recommend","this","book","by","brandon","sanderson"])
 """
 struct IndexTokenizer{T}
     vocabulary::Vector{T}
+    lookup::Dict{T, Int} # doubles space requirements but speeds up processing
     unksym::T
     unkidx::Int
     function IndexTokenizer(vocab::Vector{T}, unksym::T) where T
@@ -21,7 +22,8 @@ struct IndexTokenizer{T}
         else
             unkidx = findfirst(isequal(unksym), vocab)
         end
-        new{T}(vocab, unksym, unkidx)
+        lookup = Dict(x => idx for (idx, x) in enumerate(vocab))
+        new{T}(vocab, lookup, unksym, unkidx)
     end
 end
 
@@ -38,7 +40,12 @@ end
 Encode the tokens to indices.
 If a vector of sequences, output is maximum_sequence_length × batch_size  
 """
-encode(tokenizer::IndexTokenizer{T}, x::T) where T = something(findfirst(isequal(x), tokenizer.vocabulary), tokenizer.unkidx)
+function encode(tokenizer::IndexTokenizer{T}, x::T) where T
+    if haskey(tokenizer.lookup, x)
+        return tokenizer.lookup[x]
+    end
+    tokenizer.unkidx
+end
 
 function encode(tokenizer::IndexTokenizer{T}, seq::AbstractVector{T}) where T
     map(x->encode(tokenizer, x), seq)
