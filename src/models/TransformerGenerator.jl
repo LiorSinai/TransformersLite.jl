@@ -61,7 +61,7 @@ function Base.show(io::IO, m::MIME"text/plain", t::TransformerGenerator)
     _show_transformer_generator(io, t)
 end
 
-function _show_transformer_generator(io::IO, t::TransformerGenerator; indent::Int=0)
+function _show_transformer_generator(io::IO, t::TransformerGenerator, indent::Int=0)
     inner_indent = indent + 2
     print(io, " "^indent, "TransformerGenerator(\n")
     for layer in [t.embedding, t.position_encoding, t.dropout, t.blocks..., t.head]
