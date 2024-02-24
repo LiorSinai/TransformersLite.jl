@@ -37,10 +37,9 @@ TransformerBlock(
     dim_model::Int,
     dim_hidden::Int;
     act=relu,
-    mask::Union{Nothing, Matrix{Bool}}=nothing,
     pdrop::Float64=0.1,
     ) = TransformerBlock(
-    MultiHeadAttention(nhead, dim_model, dim_model; mask=mask),
+    MultiHeadAttention(nhead, dim_model, dim_model),
     LayerNorm(dim_model),
     Dense(dim_model, dim_hidden, act),
     Dense(dim_hidden, dim_model),
@@ -48,8 +47,9 @@ TransformerBlock(
     Dropout(pdrop),
 )
 
-function (t::TransformerBlock)(x::A) where {A<:AbstractArray}
-    h = t.multihead_attention(x, x, x) # (dm, N, B)
+function (t::TransformerBlock)(x::A; mask::M=nothing) where {
+    A<:AbstractArray, M<:Union{Nothing, AbstractArray{Bool}}}
+    h = t.multihead_attention(x, x, x; mask=mask) # (dm, N, B)
     h = t.dropout(h) 
     h = x + h
     h = t.norm_attention(h)            # (dm, N, B)

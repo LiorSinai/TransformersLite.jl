@@ -1,5 +1,11 @@
 apply_mask(logits, mask::Nothing) = logits
 
+"""
+  apply_mask(logits, mask)
+
+Keep the values of `logits` where `mask` is `true`, 
+else return negative infinity or a corresponding `typemin`.
+"""
 function apply_mask(logits, mask)
     neginf = typemin(eltype(logits))
     ifelse.(mask, logits, neginf)

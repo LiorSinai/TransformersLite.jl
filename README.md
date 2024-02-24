@@ -70,7 +70,6 @@ TransformerClassifier(
       denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
-      mask = nothing,
     ),
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
@@ -85,7 +84,6 @@ TransformerClassifier(
       denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
-      mask = nothing,
     ),
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
@@ -119,16 +117,16 @@ Create a model with `TransformersLite.TransformerGenerator`:
 ```julia
 using TransformersLite, Flux
 using TransformersLite: make_causal_mask
-mask = make_causal_mask(ones(16, 16))
 model = TransformersLite.TransformerGenerator(
     Embed(32, 65), # vocab_size is 65
     PositionEncoding(32), 
     Dropout(0.1),
     TransformerBlock[
-        TransformerBlock(4, 32, 32 * 4; pdrop=0.1, mask=mask),
-        TransformerBlock(4, 32, 32 * 4; pdrop=0.1, mask=mask),
+        TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
+        TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
     ],
-    Dense(32, 65), # vocab_size is 65 
+    Dense(32, 65), # vocab_size is 65
+    make_causal_mask(ones(16, 16)),
     )
 ```
 
@@ -140,11 +138,10 @@ TransformerGenerator(
   Dropout(0.1),
   TransformerBlock(
     MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
-      denseQ = Dense(32 => 32),         # 1_056 parameters
-      denseK = Dense(32 => 32),         # 1_056 parameters
-      denseV = Dense(32 => 32),         # 1_056 parameters
+      denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
-      mask = Bool[1 1 … 1 1; 0 1 … 1 1; … ; 0 0 … 1 1; 0 0 … 0 1],  # 256 parameters
     ),
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
@@ -155,11 +152,10 @@ TransformerGenerator(
   ),
   TransformerBlock(
     MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
-      denseQ = Dense(32 => 32),         # 1_056 parameters
-      denseK = Dense(32 => 32),         # 1_056 parameters
-      denseV = Dense(32 => 32),         # 1_056 parameters
+      denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
+      denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
-      mask = Bool[1 1 … 1 1; 0 1 … 1 1; … ; 0 0 … 1 1; 0 0 … 0 1],  # 256 parameters
     ),
     Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
@@ -169,8 +165,9 @@ TransformerGenerator(
     LayerNorm(32),                      # 64 parameters
   ),
   Dense(32 => 65),                      # 2_145 parameters
-)        # Total: 35 trainable arrays, 29_633 parameters,
-          # plus 3 non-trainable, 32_512 parameters, summarysize 243.871 KiB.
+  mask = Bool[1 1 … 1 1; 0 1 … 1 1; … ; 0 0 … 1 1; 0 0 … 0 1],  # 256 parameters
+)        # Total: 29 trainable arrays, 29_441 parameters,
+          # plus 2 non-trainable, 32_256 parameters, summarysize 242.574 KiB.
 ```
 
 Usage:

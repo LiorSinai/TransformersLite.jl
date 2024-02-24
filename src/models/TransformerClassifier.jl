@@ -18,16 +18,17 @@ end
 
 Flux.@functor TransformerClassifier
 
-function (t::TransformerClassifier)(x::A) where {A<:AbstractArray}
+function (t::TransformerClassifier)(x::A; mask::M=nothing) where {
+    A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     x = x .+ t.position_encoding(x) # (dm, N, B)
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
-        x = block(x)                # (dm, N, B)
+        x = block(x; mask=mask)     # (dm, N, B)
     end
     x = t.agg_layer(x)              # (1, N, B)
     x = t.flatten_layer(x)          # (N, B)
-    x = t.head(x)             # (n_labels, B)
+    x = t.head(x)                   # (n_labels, B)
     x
 end
 

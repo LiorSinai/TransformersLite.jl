@@ -3,23 +3,27 @@ struct TransformerGenerator{
     PE<:PositionEncoding, 
     DO<:Dropout, 
     TB<:Vector{<:TransformerBlock}, 
-    D<:Dense
+    D<:Dense,
+    M<:Union{Nothing, AbstractMatrix{Bool}},
     } 
     embedding::E
     position_encoding::PE
     dropout::DO
     blocks::TB
     head::D
+    mask::M # optional buffer
 end
 
 Flux.@functor TransformerGenerator
+Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.blocks, m.dropout, m.head)
 
-function (t::TransformerGenerator)(x::A) where {T, N, A<:AbstractArray{T, N}}
+function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
+    A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     x = x .+ t.position_encoding(x) # (dm, N, B)
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
-        x = block(x)                # (dm, N, B)
+        x = block(x; mask=mask)     # (dm, N, B)
     end
     x = t.head(x)                   # (vocab_size, N, B)
     x
@@ -31,14 +35,16 @@ end
 Generate batches of tokens starting from a given context.
 """
 function generate(
-    rng::AbstractRNG, model::TransformerGenerator, context::Matrix{T}
-    ; context_size::Int, max_tokens::Int=100
+    rng::AbstractRNG, model::TransformerGenerator, context::AbstractMatrix{T}
+    ; context_size::Int, max_tokens::Int=100,
     ) where T
     num_batches = size(context, 2)
     vocab_size = size(model.head.weight, 1)
     for i in 1:max_tokens
         context_crop = tail(context, context_size) # forget everything before the current context
-        logits = model(context_crop) |> cpu # (vocab_size, T, B)
+        n = size(context_crop, 1)
+        mask = isnothing(model.mask) ? nothing : view(model.mask, Base.OneTo(n), Base.OneTo(n))
+        logits = model(context_crop; mask=mask) |> cpu # (vocab_size, n, B)
         # only focus on the last token
         # This means that some of the work done in the last block and in model.head is discarded
         logits = logits[:, end, :] # (vocab_size, B) 
@@ -52,7 +58,7 @@ function generate(
     context
 end
 
-function generate(model::TransformerGenerator, context::Matrix; kwargs...)
+function generate(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
     generate(Random.default_rng(), model, context; kwargs...)
 end
 
@@ -71,6 +77,7 @@ function _show_transformer_generator(io::IO, t::TransformerGenerator, indent::In
             Flux._layer_show(io, layer, inner_indent)
         end
     end
+    Flux._layer_show(io, t.mask, inner_indent, "mask")
     print(io, " "^indent, ")")
     if indent == 0
         Flux._big_finale(io, t)
