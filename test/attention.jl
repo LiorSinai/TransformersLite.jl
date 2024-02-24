@@ -1,7 +1,6 @@
 using TransformersLite: multi_head_scaled_dot_attention, scaled_dot_attention, make_causal_mask
 using LinearAlgebra
 using Flux: pullback
-using Flux: MultiHeadAttention
 
 @testset "multi-head attention" verbose=true begin
 
