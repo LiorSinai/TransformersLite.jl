@@ -2,7 +2,9 @@ using Test
 using TransformersLite: mul4d
 using Flux: pullback
 
-@testset "mul4d" begin
+@testset "mul4d" verbose=true begin
+
+@testset "forward" begin
     # Integer
     A = rand(-100:100, 2, 2, 3, 4)
     B = rand(-100:100, 2, 2, 3, 4)
@@ -30,7 +32,7 @@ using Flux: pullback
     @test_throws DimensionMismatch mul4d(A, B)
 end
 
-@testset "mul4d grad" begin
+@testset "grad" begin
     # Real
     A = randn(7, 5, 3, 4)
     B = randn(5, 7, 3, 4)
@@ -42,4 +44,6 @@ end
     @test grad_test(mul4d, AT, BT, randn(5, 5, 3, 4))
     @test grad_test(mul4d, AT, C, randn(5, 6, 3, 4))
     @test grad_test(mul4d, AT, A, randn(5, 5, 3, 4))
+end
+
 end
