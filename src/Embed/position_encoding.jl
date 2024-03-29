@@ -33,13 +33,15 @@ function make_position_encoding(dim_embedding::Int, seq_length::Int, n::Int=1000
     encoding    
 end
 
-(pe::PositionEncoding)(x::AbstractArray) = (pe::PositionEncoding)(size(x, 2))
+(pe::PositionEncoding)(x::AbstractArray{<:Integer}) = NNlib.gather(pe.weight, x) # assume array of indices
+(pe::PositionEncoding)(x::AbstractArray{<:AbstractFloat}) = (pe::PositionEncoding)(size(x, 2)) # assume array of weights
+
 function (pe::PositionEncoding)(seq_length::Int)
     max_length = size(pe.weight, 2)
     if seq_length > max_length
         error("sequence length of $seq_length exceeds maximum position encoding length of $max_length")
     end
-    view(pe.weight, :, Base.OneTo(seq_length))
+    pe(1:seq_length)
 end
 
 function Base.show(io::IO, pe::PositionEncoding)

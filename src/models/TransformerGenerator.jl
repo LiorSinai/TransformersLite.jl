@@ -1,6 +1,6 @@
 struct TransformerGenerator{
-    E<:Embed, 
-    PE<:PositionEncoding, 
+    E<:Union{Embed, Flux.Embedding}, 
+    PE<:Union{Embed, Flux.Embedding, PositionEncoding}, 
     DO<:Dropout, 
     TB<:Vector{<:TransformerBlock}, 
     D<:Dense,
@@ -20,7 +20,8 @@ Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.blocks, m.dropout, m
 function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
-    x = x .+ t.position_encoding(x) # (dm, N, B)
+    N = size(x, 2)
+    x = x .+ t.position_encoding(1:N) # (dm, N, B)
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
         x = block(x; mask=mask)     # (dm, N, B)
