@@ -11,51 +11,46 @@ Flux.@functor MultiHeadAttention
 Flux.trainable(m::MultiHeadAttention) = (; m.denseQ, m.denseK, m.denseV, m.denseO)
 
 """
-    MultiHeadAttention(nhead, dim_model, [dim_head,] dim_out)
+    MultiHeadAttention(nhead, dim_in, [dim_head,] dim_out)
 
 Multi-head dot product attention Layer. `nhead` is the number of heads, 
-`dim_model` is the model embedding dimension size, `dim_head` is the size of each head, 
-`dim_out` is the output size. If `dim_head` is not specified, it defaults to `dim_model ÷ nhead`.
+`dim_in` is the input dimension size, `dim_head` is the size of each head, 
+`dim_out` is the output size. If `dim_head` is not specified, it defaults to `dim_in ÷ nhead`.
 """
 function MultiHeadAttention(
-    nhead::Int, dim_model::Int, dim_head::Int, dim_out::Int
+    nhead::Int, dim_in::Int, dim_head::Int, dim_out::Int
     )
     MultiHeadAttention(
         nhead,
-        Dense(dim_model, dim_head*nhead; bias=false),
-        Dense(dim_model, dim_head*nhead; bias=false),
-        Dense(dim_model, dim_head*nhead; bias=false),
+        Dense(dim_in, dim_head*nhead; bias=false),
+        Dense(dim_in, dim_head*nhead; bias=false),
+        Dense(dim_in, dim_head*nhead; bias=false),
         Dense(dim_head*nhead, dim_out),
     )
 end
 
 function MultiHeadAttention(
-    nhead::Int, dim_model::Int, dim_out::Int
+    nhead::Int, dim_in::Int, dim_out::Int
     )
-    if dim_model % nhead != 0 
-        error("embedding dimension=$dim_model is not divisible by number of heads=$nhead")
+    if dim_in % nhead != 0 
+        error("input dimension=$dim_in is not divisible by number of heads=$nhead")
     end
-    MultiHeadAttention(nhead, dim_model, div(dim_model, nhead), dim_out)
+    MultiHeadAttention(nhead, dim_in, div(dim_in, nhead), dim_out)
 end
 
 function (mha::MultiHeadAttention)(
-    query::A1, key::A2, value::A3
-    ; mask::M=nothing
-    ) where {
-    T, A1 <: AbstractArray{T, 3}, A2 <: AbstractArray{T, 3}, A3 <: AbstractArray{T, 3},
-    M <:Union{Nothing, AbstractArray{Bool}}
-    }
+    query::A3, key::A3, value::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
     # batch multiplication version. Input is dm × N × B
     #size(Q) == (dh*nhead, N, B)
     Q = mha.denseQ(query)
     K = mha.denseK(key)
     V = mha.denseV(value)
-    A = multi_head_scaled_dot_attention(mha.nhead, Q, K, V; mask=mask)
+    A = multi_head_scaled_dot_attention(mha.nhead, Q, K, V; kwargs...)
     mha.denseO(A)
 end
 
-function (mha::MultiHeadAttention)(query::A1, key::A2, value::A3; kwargs...) where {
-    T, A1 <: AbstractMatrix{T}, A2 <: AbstractMatrix{T}, A3 <: AbstractMatrix{T}}
+function (mha::MultiHeadAttention)(query::A2, key::A2, value::A2
+    ; kwargs...) where {T, A2 <: AbstractMatrix{T}}
     # single sample. Make it a batch of 1
     query = reshape(query, size(query, 1), size(query, 2), 1)
     key = reshape(key, size(key, 1), size(key, 2), 1)
