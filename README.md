@@ -7,7 +7,6 @@ This package is designed to work with [Flux](https://github.com/FluxML/Flux.jl).
 
 It comes with the following layers:
 - `Indexer`: map tokens to indices.
-- `Embed`: and embedding layer, similar to `Flux.Embedding`.
 - `PositionEncoding`: a fixed sinusodial layer as described in [Attention is all you need](https://arxiv.org/abs/1706.03762) paper.
 - `MultiHeadAttention`: similar to but differs from `Flux.MultiHeadAttention`.
 - `MeanLayer`
@@ -30,7 +29,7 @@ using TransformersLite, Flux
 position_encoding = PositionEncoding(32)
 add_position_encoding(x) = x .+ position_encoding(x)
 model = Chain(
-    Embed(32, 1000), # vocab length is 1000
+    Embedding(1000 => 32), # vocab length is 1000
     add_position_encoding, # can also make anonymous
     Dropout(0.1),
     TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
@@ -45,7 +44,7 @@ Create a model with `TransformersLite.TransformerClassifier`:
 ```julia
 using TransformersLite, Flux
 model = TransformersLite.TransformerClassifier(
-    Embed(32, 1000), # vocab length is 1000
+    Embedding(1000 => 32), # vocab length is 1000
     PositionEncoding(32), 
     Dropout(0.1),
     TransformerBlock[
@@ -61,7 +60,7 @@ model = TransformersLite.TransformerClassifier(
 Output looks like:
 ```julia
 TransformerClassifier(
-  Embed((32, 1000)),                    # 32_000 parameters
+  Embedding(1000 => 32),                    # 32_000 parameters
   PositionEncoding(32),
   Dropout(0.1),
   TransformerBlock(
@@ -118,8 +117,8 @@ Create a model with `TransformersLite.TransformerGenerator`:
 using TransformersLite, Flux
 using TransformersLite: make_causal_mask
 model = TransformersLite.TransformerGenerator(
-    Embed(32, 65), # vocab_size is 65
-    PositionEncoding(32), 
+    Embedding(65 => 32), # vocab_size is 65
+    Embedding(16 => 32), 
     Dropout(0.1),
     TransformerBlock[
         TransformerBlock(4, 32, 32 * 4; pdrop=0.1),
@@ -133,7 +132,7 @@ model = TransformersLite.TransformerGenerator(
 Output looks like:
 ```julia
 TransformerGenerator(
-  Embed((32, 65)),                      # 2_080 parameters
+  Embedding(65 => 32),                      # 2_080 parameters
   PositionEncoding(32),
   Dropout(0.1),
   TransformerBlock(
@@ -204,7 +203,7 @@ They have since been moved to [github.com/LiorSinai/TransformersLite-Examples](h
 ## Installation
 
 Download the GitHub repository (it is not registered). Then in the Julia REPL:
-```julia-repl
+```
 julia> ] # enter package mode
 (@v1.x) pkg> dev path\\to\\TransformersLite.jl
 julia> using Revise # for dynamic editing of code

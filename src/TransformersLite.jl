@@ -21,10 +21,9 @@ export scaled_dot_attention, multi_head_scaled_dot_attention
 
 ## Layers
 include("Embed/tokenizer.jl")
-include("Embed/embed.jl")
 include("Embed/position_encoding.jl")
 export IndexTokenizer, encode, decode
-export Embed, PositionEncoding
+export PositionEncoding
 
 include("MultiHeadAttention.jl")
 export MultiHeadAttention

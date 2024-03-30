@@ -5,7 +5,7 @@ using Flux: pullback
 
 @testset "TransformerClassifier" begin
     model = TransformersLite.TransformerClassifier(
-        Embed(32, 100), # vocab length is 100
+        Embedding(100 => 32), # vocab length is 100
         PositionEncoding(32), 
         Dropout(0.1),
         TransformerBlock[

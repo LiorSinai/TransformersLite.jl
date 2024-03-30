@@ -1,6 +1,6 @@
 struct TransformerGenerator{
-    E<:Union{Embed, Flux.Embedding}, 
-    PE<:Union{Embed, Flux.Embedding, PositionEncoding}, 
+    E<:Flux.Embedding, 
+    PE<:Union{Flux.Embedding, PositionEncoding}, 
     DO<:Dropout, 
     TB<:Vector{<:TransformerBlock}, 
     D<:Dense,
@@ -42,7 +42,7 @@ function generate(
     for i in 1:max_tokens
         context_crop = tail(context, context_size) # forget everything before the current context
         n = size(context_crop, 1)
-        mask = isnothing(model.mask) ? nothing : view(model.mask, Base.OneTo(n), Base.OneTo(n))
+        mask = isnothing(model.mask) ? nothing : view(model.mask, 1:n, 1:n)
         logits = model(context_crop; mask=mask) |> cpu # (vocab_size, n, B)
         # only focus on the last token
         # This means that some of the work done in the last block and in model.head is discarded

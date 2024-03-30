@@ -1,6 +1,6 @@
 struct TransformerClassifier{
-        E<:Union{Embed, Flux.Embedding}, 
-        PE<:Union{Embed, Flux.Embedding, PositionEncoding}, 
+        E<:Flux.Embedding, 
+        PE<:Union{Flux.Embedding, PositionEncoding}, 
         DO<:Dropout, 
         TB<:Vector{<:TransformerBlock}, 
         A, 
