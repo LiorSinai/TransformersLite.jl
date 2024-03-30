@@ -3,20 +3,18 @@ module TransformersLite
 using ChainRulesCore: @thunk
 using Flux
 using LinearAlgebra
-using NNlib: gather, softmax
+using NNlib: gather, softmax, batched_mul
 using Random
 using StatsBase
 
 import ChainRulesCore: rrule, NoTangent
-import NNlib: batched_mul
 
 ## Functions
 include("attention.jl")
-include("batched_mul_4d.jl")
 include("mask.jl")
 include("mul4d.jl")
 include("tail.jl")
-export batched_mul, mul4d
+export mul4d
 export scaled_dot_attention, multi_head_scaled_dot_attention
 
 ## Layers

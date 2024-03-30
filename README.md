@@ -13,8 +13,8 @@ It comes with the following layers:
 - `FlattenLayer`
 - `TransformerBlock`: this encompasses a `MultiHeadAttention` layer followed by a dense feed forward network, with dropout and normalization.
 
-Two implementations are provided for the 4D batch multiplication such that `A×B` results in `C[:,:,k,l] == A[:,:,k,l] * B[:,:,k,l]`.
-These are `mul4d` and an extension to `NNlib.batched_mul`. The extension to `batched_mul` is about 1.5× faster than `mul4d`.
+The `mul4d` function is provided for 4D batch multiplication such that `A×B` results in `C[:,:,k,l] == A[:,:,k,l] * B[:,:,k,l]`.
+The same calculation can be done with `NNlib.batched_mul` which is at least 1.5× faster than `mul4d`.
 
 These layers can be used together with `Flux.Chain`. For convenience, the following models are also provided:
 - `TransformerClassifier`: a transformer encoder followed by some aggregation layer (use `MeanLayer` or `Dense`), a `FlattenLayer` and a `Dense` layer for the head.
