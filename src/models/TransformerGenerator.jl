@@ -15,7 +15,7 @@ struct TransformerGenerator{
 end
 
 Flux.@functor TransformerGenerator
-Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.blocks, m.dropout, m.head)
+Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.position_encoding, m.blocks, m.dropout, m.head)
 
 function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
