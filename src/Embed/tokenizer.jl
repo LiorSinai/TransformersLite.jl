@@ -41,10 +41,7 @@ Encode the tokens to indices.
 If a vector of sequences, output is maximum_sequence_length × batch_size  
 """
 function encode(tokenizer::IndexTokenizer{T}, x::T) where T
-    if haskey(tokenizer.lookup, x)
-        return tokenizer.lookup[x]
-    end
-    tokenizer.unkidx
+    get(tokenizer.lookup, x, tokenizer.unkidx)
 end
 
 function encode(tokenizer::IndexTokenizer{T}, seq::AbstractVector{T}) where T

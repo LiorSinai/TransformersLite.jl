@@ -38,8 +38,6 @@ function generate(
     rng::AbstractRNG, model::TransformerGenerator, context::AbstractMatrix{T}
     ; context_size::Int, max_tokens::Int=100,
     ) where T
-    num_batches = size(context, 2)
-    vocab_size = size(model.head.weight, 1)
     for i in 1:max_tokens
         context_crop = tail(context, context_size) # forget everything before the current context
         n = size(context_crop, 1)
@@ -48,18 +46,20 @@ function generate(
         # only focus on the last token
         # This means that some of the work done in the last block and in model.head is discarded
         logits = logits[:, end, :] # (vocab_size, B) 
-        probs = softmax(logits; dims=1) # (vocab_size, B)
-        context_next = Matrix{T}(undef, 1, num_batches) # (vocab_size, B)
-        for b in 1:num_batches
-            context_next[:, b] = sample(rng, 1:vocab_size, Weights(probs[:, b]), 1)
-        end
-        context = cat(context, context_next; dims=1) 
+        context_next = multinomial_sampling(rng, logits)
+        context = cat(context, transpose(context_next); dims=1) 
     end
     context
 end
 
 function generate(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
     generate(Random.default_rng(), model, context; kwargs...)
+end
+
+function multinomial_sampling(rng::AbstractRNG, logits::AbstractMatrix)
+    probs = softmax(logits; dims=1)
+    tokens = [sample(rng, Weights(p)) for p in eachcol(probs)]
+    tokens
 end
 
 ## Show
