@@ -45,8 +45,8 @@ function (mha::MultiHeadAttention)(
     Q = mha.denseQ(query)
     K = mha.denseK(key)
     V = mha.denseV(value)
-    A = multi_head_scaled_dot_attention(mha.nhead, Q, K, V; kwargs...)
-    mha.denseO(A)
+    A, scores = multi_head_scaled_dot_attention(mha.nhead, Q, K, V; kwargs...)
+    mha.denseO(A), scores
 end
 
 function (mha::MultiHeadAttention)(query::A2, key::A2, value::A2
@@ -55,8 +55,8 @@ function (mha::MultiHeadAttention)(query::A2, key::A2, value::A2
     query = reshape(query, size(query, 1), size(query, 2), 1)
     key = reshape(key, size(key, 1), size(key, 2), 1)
     value = reshape(value, size(value, 1), size(value, 2), 1)
-    A = mha(query, key, value; kwargs...)
-    reshape(A, size(A, 1), size(A, 2))
+    A, scores = mha(query, key, value; kwargs...)
+    reshape(A, size(A, 1), size(A, 2)), reshape(scores, size(scores)[1:3]...)
 end
 
 ## Show

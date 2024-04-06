@@ -30,7 +30,6 @@ layer norms and residual connections.
 `dim_model` is the model dimension also known as the embedding layer dimension. 
 The input and output are both of size `dim_model`.     
 `dim_hidden` is the size of the hidden layer between the two dense layers.
-
 """
 TransformerBlock(
     nhead::Int,
@@ -49,7 +48,7 @@ TransformerBlock(
 
 function (t::TransformerBlock)(x::A; mask::M=nothing) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractArray{Bool}}}
-    h = t.multihead_attention(x, x, x; mask=mask) # (dm, N, B)
+    h, scores = t.multihead_attention(x, x, x; mask=mask) # (dm, N, B)
     h = t.dropout(h) 
     h = x + h
     h = t.norm_attention(h)            # (dm, N, B)
