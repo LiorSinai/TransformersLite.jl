@@ -1,7 +1,11 @@
 # TransformersLite
 
-A basic transformer package. This repository is meant for learning
-and is paired with this [blog post](https://liorsinai.github.io/coding/2022/05/18/transformers.html). For a much more comprehensive package with APIs for HuggingFace, optimizations and more, please see Transformers.jl at [github.com/chengchingwen/Transformers.jl](https://github.com/chengchingwen/Transformers.jl).
+A basic transformer package. This repository is meant for learning and is paired with these blog posts:
+
+- [Transformers from first principles in Julia](https://liorsinai.github.io/coding/2022/05/18/transformers.html).
+- [Generative transformer from first principles in Julia](https://liorsinai.github.io/coding/2024/03/23/transformers-gpt.html).
+
+For a much more comprehensive package with APIs for HuggingFace, optimizations and more, please see Transformers.jl at [github.com/chengchingwen/Transformers.jl](https://github.com/chengchingwen/Transformers.jl).
 
 This package is designed to work with [Flux](https://github.com/FluxML/Flux.jl). It implements multi-head attention as described in the paper [Attention is all you need](https://arxiv.org/abs/1706.03762).
 
