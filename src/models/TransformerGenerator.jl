@@ -1,6 +1,6 @@
 struct TransformerGenerator{
-    E<:Embed, 
-    PE<:PositionEncoding, 
+    E<:Flux.Embedding, 
+    PE<:Union{Flux.Embedding, PositionEncoding}, 
     DO<:Dropout, 
     TB<:Vector{<:TransformerBlock}, 
     D<:Dense,
@@ -15,12 +15,13 @@ struct TransformerGenerator{
 end
 
 Flux.@functor TransformerGenerator
-Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.blocks, m.dropout, m.head)
+Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.position_encoding, m.blocks, m.dropout, m.head)
 
 function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
-    x = x .+ t.position_encoding(x) # (dm, N, B)
+    N = size(x, 2)
+    x = x .+ t.position_encoding(1:N) # (dm, N, B)
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
         x = block(x; mask=mask)     # (dm, N, B)
@@ -41,7 +42,7 @@ function generate(
     for i in 1:max_tokens
         context_crop = tail(context, context_size) # forget everything before the current context
         n = size(context_crop, 1)
-        mask = isnothing(model.mask) ? nothing : view(model.mask, Base.OneTo(n), Base.OneTo(n))
+        mask = isnothing(model.mask) ? nothing : view(model.mask, 1:n, 1:n)
         logits = model(context_crop; mask=mask) |> cpu # (vocab_size, n, B)
         # only focus on the last token
         # This means that some of the work done in the last block and in model.head is discarded

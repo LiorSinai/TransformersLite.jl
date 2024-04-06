@@ -1,9 +1,9 @@
 using Test
 using TransformersLite: mul4d
 using Flux: pullback
+using NNlib: batched_mul
 
 @testset "mul4d" verbose=true begin
-
 @testset "forward" begin
     # Integer
     A = rand(-100:100, 2, 2, 3, 4)
@@ -30,6 +30,14 @@ using Flux: pullback
     @test_throws DimensionMismatch mul4d(A, B)
     B = randn(5, 7, 3, 2)
     @test_throws DimensionMismatch mul4d(A, B)
+end
+
+@testset "batched_mul" begin 
+    A = randn(7, 5, 3, 4)
+    B = randn(5, 7, 3, 4)
+    C1 = mul4d(A, B)
+    C2 = batched_mul(A, B)
+    @test C1 ≈ C2
 end
 
 @testset "grad" begin

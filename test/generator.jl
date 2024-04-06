@@ -5,7 +5,7 @@ using Flux: pullback
 
 @testset "TransformerGenerator" begin
     model = TransformersLite.TransformerGenerator(
-        Embed(32, 65), # vocab_size is 65
+        Embedding(65 => 32), # vocab_size is 65
         PositionEncoding(32), 
         Dropout(0.1),
         TransformerBlock[

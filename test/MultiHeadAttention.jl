@@ -9,19 +9,19 @@ using Test
     mha = TransformersLite.MultiHeadAttention(nhead, dim_model, dim_out)
 
     x = randn(Float32, 32, 10, 5)
-    y = mha(x, x, x; mask=mask)
+    y, scores = mha(x, x, x; mask=mask)
     @test size(y) == (13, 10, 5)
 
-    y2 = mha(x, x, x)
+    y2, scores = mha(x, x, x)
     @test !isapprox(y, y2) # the mask changes output
 
     # gradients
     # use sum as a dummy loss function
-    y0, back = pullback(m->sum(m(x, x, x)), mha)
+    y0, back = pullback(m->sum(m(x, x, x)[1]), mha)
     grads = back(1.0)
     @test length(grads[1]) == 5
 
-    y1, back = pullback(m->sum(m(x, x, x; mask=mask)), mha)
+    y1, back = pullback(m->sum(m(x, x, x; mask=mask)[1]), mha)
     grads = back(1.0)
     @test length(grads[1]) == 5
 
@@ -29,6 +29,6 @@ using Test
     mha = TransformersLite.MultiHeadAttention(nhead, dim_model, dim_head, dim_out)
 
     x = randn(Float32, 32, 10, 5)
-    y = mha(x, x, x)
+    y, scores = mha(x, x, x)
     @test size(y) == (13, 10, 5)
 end
