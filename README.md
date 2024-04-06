@@ -20,7 +20,13 @@ These layers can be used together with `Flux.Chain`. For convenience, the follow
 - `TransformerClassifier`: a transformer encoder followed by some aggregation layer (use `MeanLayer` or `Dense`), a `FlattenLayer` and a `Dense` layer for the head.
 - `TransformerGenerator`: a transformer encoder with masking followed by a `Dense` layer for the head.
 
+
 ## Examples
+### Examples Repository
+
+More extensive examples were part of this repository.
+They have since been moved to [github.com/LiorSinai/TransformersLite-Examples](https://github.com/LiorSinai/TransformersLite-Examples).
+
 ### Classifier
 
 Create a model with `Flux.Chain`:
@@ -196,9 +202,6 @@ model = gpu(model) # using the classifier above
 X = gpu(X)   # 10×8 CuArray{Int64, 2, CUDA.Mem.DeviceBuffer}
 Y = model(X) # 3×8 CuArray{Float32, 2, CUDA.Mem.DeviceBuffer}
 ```
-
-More extensive examples were part of this repository.
-They have since been moved to [github.com/LiorSinai/TransformersLite-Examples](https://github.com/LiorSinai/TransformersLite-Examples).
 
 ## Installation
 
