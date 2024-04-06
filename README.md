@@ -22,7 +22,7 @@ The same calculation can be done with `NNlib.batched_mul` which is at least 1.5Ã
 
 These layers can be used together with `Flux.Chain`. For convenience, the following models are also provided:
 - `TransformerClassifier`: a transformer encoder followed by some aggregation layer (use `MeanLayer` or `Dense`), a `FlattenLayer` and a `Dense` layer for the head.
-- `TransformerGenerator`: a transformer encoder with masking followed by a `Dense` layer for the head.
+- `TransformerGenerator`: a transformer decoder with masking followed by a `Dense` layer for the head.
 
 
 ## Examples
