@@ -70,42 +70,44 @@ model = TransformersLite.TransformerClassifier(
 Output looks like:
 ```julia
 TransformerClassifier(
-  Embedding(1000 => 32),                    # 32_000 parameters
+  Embedding(1000 => 32),                # 32_000 parameters
   PositionEncoding(32),
   Dropout(0.1),
-  TransformerBlock(
-    MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
-      denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
-      denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
-      denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
-      denseO = Dense(32 => 32),         # 1_056 parameters
+  [
+    TransformerBlock(
+      MultiHeadAttention(
+        nhead=4,
+        denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
+        denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
+        denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
+        denseO = Dense(32 => 32),       # 1_056 parameters
+      ),
+      LayerNorm(32),                    # 64 parameters
+      Dense(32 => 128, relu),           # 4_224 parameters
+      Dense(128 => 32),                 # 4_128 parameters
+      LayerNorm(32),                    # 64 parameters
+      Dropout(0.1),
     ),
-    Dropout(0.1),
-    LayerNorm(32),                      # 64 parameters
-    Dense(32 => 128, relu),             # 4_224 parameters
-    Dense(128 => 32),                   # 4_128 parameters
-    Dropout(0.1),
-    LayerNorm(32),                      # 64 parameters
-  ),
-  TransformerBlock(
-    MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
-      denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
-      denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
-      denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
-      denseO = Dense(32 => 32),         # 1_056 parameters
+    TransformerBlock(
+      MultiHeadAttention(
+        nhead=4,
+        denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
+        denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
+        denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
+        denseO = Dense(32 => 32),       # 1_056 parameters
+      ),
+      LayerNorm(32),                    # 64 parameters
+      Dense(32 => 128, relu),           # 4_224 parameters
+      Dense(128 => 32),                 # 4_128 parameters
+      LayerNorm(32),                    # 64 parameters
+      Dropout(0.1),
     ),
-    Dropout(0.1),
-    LayerNorm(32),                      # 64 parameters
-    Dense(32 => 128, relu),             # 4_224 parameters
-    Dense(128 => 32),                   # 4_128 parameters
-    Dropout(0.1),
-    LayerNorm(32),                      # 64 parameters
-  ),
+  ],
   Dense(32 => 1),                       # 33 parameters
   FlattenLayer(),
   Dense(10 => 3),                       # 33 parameters
-)        # Total: 31 trainable arrays, 57_282 parameters,
-          # plus 1 non-trainable, 32_000 parameters, summarysize 351.141 KiB.
+)         # Total: 31 trainable arrays, 57_282 parameters,
+          # plus 1 non-trainable, 32_000 parameters, summarysize 350.672 KiB.
 ```
 
 Usage:
@@ -142,41 +144,41 @@ model = TransformersLite.TransformerGenerator(
 Output looks like:
 ```julia
 TransformerGenerator(
-  Embedding(65 => 32),                      # 2_080 parameters
-  PositionEncoding(32),
+  Embedding(65 => 32),                  # 2_080 parameters
+  Embedding(16 => 32),                  # 512 parameters
   Dropout(0.1),
   TransformerBlock(
-    MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
+    MultiHeadAttention(
+      nhead=4,
       denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
     ),
-    Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
     Dense(32 => 128, relu),             # 4_224 parameters
     Dense(128 => 32),                   # 4_128 parameters
-    Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
+    Dropout(0.1),
   ),
   TransformerBlock(
-    MultiHeadAttention(num_heads=4, head_size=8, 32=>32)(
+    MultiHeadAttention(
+      nhead=4,
       denseQ = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseK = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseV = Dense(32 => 32; bias=false),  # 1_024 parameters
       denseO = Dense(32 => 32),         # 1_056 parameters
     ),
-    Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
     Dense(32 => 128, relu),             # 4_224 parameters
     Dense(128 => 32),                   # 4_128 parameters
-    Dropout(0.1),
     LayerNorm(32),                      # 64 parameters
+    Dropout(0.1),
   ),
   Dense(32 => 65),                      # 2_145 parameters
-  mask = Bool[1 1 … 1 1; 0 1 … 1 1; … ; 0 0 … 1 1; 0 0 … 0 1],  # 256 parameters
-)        # Total: 29 trainable arrays, 29_441 parameters,
-          # plus 2 non-trainable, 32_256 parameters, summarysize 242.574 KiB.
+  mask = 16×16 Matrix{Bool},
+)        # Total: 30 trainable arrays, 29_953 parameters,
+          # plus 1 non-trainable, 256 parameters, summarysize 119.121 KiB.
 ```
 
 Usage:
@@ -203,6 +205,7 @@ context # 101×1 Matrix{Int64}
 ```julia
 using CUDA, cuDNN # As of Julia 1.9, these must be loaded separately to FLux
 model = gpu(model) # using the classifier above
+X = rand(1:vocab_size, sentence_length, batch_size)
 X = gpu(X)   # 10×8 CuArray{Int64, 2, CUDA.Mem.DeviceBuffer}
 Y = model(X) # 3×8 CuArray{Float32, 2, CUDA.Mem.DeviceBuffer}
 ```

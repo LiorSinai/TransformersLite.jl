@@ -8,6 +8,7 @@ using Random
 using StatsBase
 
 import ChainRulesCore: rrule, NoTangent
+import Flux: _big_show
 
 ## Functions
 include("attention.jl")

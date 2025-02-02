@@ -13,8 +13,7 @@ struct PositionEncoding{W <: AbstractArray}
     weight::W
 end
 
-Flux.@functor PositionEncoding
-Flux.trainable(m::PositionEncoding) = (;)
+Flux.@layer PositionEncoding trainable=()
 
 function PositionEncoding(dim_embedding::Int, max_length::Int=1000)
     W = make_position_encoding(dim_embedding, max_length)
