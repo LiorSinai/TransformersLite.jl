@@ -1,7 +1,7 @@
 name = "TransformersLite"
 uuid = "6579f8b0-5af2-4c97-8a45-e81aa57d569b"
 authors = ["Lior Sinai <sinailior@gmail.com>"]
-version = "0.4"
+version = "0.5"
 
 [deps]
 ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
@@ -12,8 +12,8 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
-Flux = "0.14"
-julia = "1.9"
+Flux = "0.16"
+julia = ">=1.9"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
