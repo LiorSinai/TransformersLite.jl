@@ -7,8 +7,7 @@ struct MultiHeadAttention{Q<:Dense, K<:Dense, V<:Dense, O<:Dense}
 end
 
 # tell Flux which parameters are trainable
-Flux.@layer :ignore MultiHeadAttention
-Flux.trainable(m::MultiHeadAttention) = (; m.denseQ, m.denseK, m.denseV, m.denseO)
+Flux.@layer :ignore MultiHeadAttention trainable=(denseQ, denseK, denseV, denseO)
 
 """
     MultiHeadAttention(nhead, dim_in, [dim_head,] dim_out)
