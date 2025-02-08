@@ -14,8 +14,7 @@ struct TransformerGenerator{
     mask::M # optional buffer
 end
 
-Flux.@functor TransformerGenerator
-Flux.trainable(m::TransformerGenerator) = (; m.embedding, m.position_encoding, m.blocks, m.dropout, m.head)
+Flux.@layer :ignore TransformerGenerator trainable=(embedding, position_encoding, blocks, dropout, head)
 
 function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
@@ -72,10 +71,12 @@ function _show_transformer_generator(io::IO, t::TransformerGenerator, indent::In
     inner_indent = indent + 2
     print(io, " "^indent, "TransformerGenerator(\n")
     for layer in [t.embedding, t.position_encoding, t.dropout, t.blocks..., t.head]
-        if typeof(layer) <: TransformerBlock
-            _show_transformer_block(io, layer, inner_indent)
-        else
+        if get(io, :typeinfo, nothing) === nothing  # e.g. top level in REPL
+            Flux._big_show(io, layer, inner_indent)
+        elseif !get(io, :compact, false)  # e.g. printed inside a Vector, but not a Matrix
             Flux._layer_show(io, layer, inner_indent)
+        else
+            show(io, layer)
         end
     end
     Flux._layer_show(io, t.mask, inner_indent, "mask")
@@ -83,6 +84,6 @@ function _show_transformer_generator(io::IO, t::TransformerGenerator, indent::In
     if indent == 0
         Flux._big_finale(io, t)
     else
-        println(io, ",")
+        println(io, " "^indent, ",")
     end
 end

@@ -14,7 +14,7 @@ struct TransformerBlock{
 end
 
 # make whole layer trainable
-Flux.@functor TransformerBlock
+Flux.@layer TransformerBlock
 
 """
     TransformerBlock(
@@ -72,34 +72,3 @@ function Base.show(io::IO, block::TransformerBlock)
     print(io, ")")
 end
 
-function Base.show(io::IO, m::MIME"text/plain", block::TransformerBlock)
-    if get(io, :typeinfo, nothing) === nothing  # e.g. top level in REPL
-        _show_transformer_block(io, block)
-    elseif !get(io, :compact, false)  # e.g. printed inside a Vector, but not a Matrix
-      Flux._layer_show(io, block)
-    else
-      show(io, block)
-    end
-end
-
-function _show_transformer_block(io::IO, t::TransformerBlock, indent=0)
-    inner_indent = indent + 2
-    print(io, " "^indent, "TransformerBlock(\n")
-    _show_multiheadattention(io, t.multihead_attention, inner_indent)
-    for layer in [
-        t.dropout,
-        t.norm_attention,
-        t.dense1,
-        t.dense2,
-        t.dropout,
-        t.norm_feedforward
-        ]
-        Flux._layer_show(io, layer, inner_indent)
-    end
-    print(io, " "^indent, ")")
-    if indent == 0
-        Flux._big_finale(io, t)
-    else
-        println(io, ",")
-    end
-end

@@ -7,8 +7,7 @@ struct MultiHeadAttention{Q<:Dense, K<:Dense, V<:Dense, O<:Dense}
 end
 
 # tell Flux which parameters are trainable
-Flux.@functor MultiHeadAttention
-Flux.trainable(m::MultiHeadAttention) = (; m.denseQ, m.denseK, m.denseV, m.denseO)
+Flux.@layer :ignore MultiHeadAttention trainable=(denseQ, denseK, denseV, denseO)
 
 """
     MultiHeadAttention(nhead, dim_in, [dim_head,] dim_out)
@@ -66,19 +65,16 @@ function Base.show(io::IO, mha::MultiHeadAttention)
     dm = size(mha.denseQ.weight)[2]
     dout = size(mha.denseO.weight)[1]
     print(io, "MultiHeadAttention(")
-    print(io, "num_heads=$(mha.nhead), ")
+    print(io, "nhead=$(mha.nhead), ")
     print(io, "head_size=$(dh), ")
     print(io, "$(dm)=>$(dout)")
     print(io, ")")
 end
 
-function Base.show(io::IO, m::MIME"text/plain", mha::MultiHeadAttention)
-    _show_multiheadattention(io, mha)
-end
-
-function _show_multiheadattention(io::IO, mha::MultiHeadAttention, indent=0)
+function Flux._big_show(io::IO, mha::MultiHeadAttention, indent::Int=0)
     inner_indent = indent + 2
-    print(io, " "^indent, mha, "(\n") 
+    print(io, " "^indent, "MultiHeadAttention(\n") 
+    println(io, " "^inner_indent, "nhead=$(mha.nhead),")
     Flux._layer_show(io, mha.denseQ, inner_indent, "denseQ")
     Flux._layer_show(io, mha.denseK, inner_indent, "denseK")
     Flux._layer_show(io, mha.denseV, inner_indent, "denseV")
