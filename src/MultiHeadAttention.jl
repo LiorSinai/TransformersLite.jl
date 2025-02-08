@@ -71,7 +71,7 @@ function Base.show(io::IO, mha::MultiHeadAttention)
     print(io, ")")
 end
 
-function _big_show(io::IO, mha::MultiHeadAttention, indent::Int=0)
+function Flux._big_show(io::IO, mha::MultiHeadAttention, indent::Int=0)
     inner_indent = indent + 2
     print(io, " "^indent, "MultiHeadAttention(\n") 
     println(io, " "^inner_indent, "nhead=$(mha.nhead),")
