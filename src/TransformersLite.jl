@@ -25,7 +25,7 @@ export IndexTokenizer, encode, decode
 export PositionEncoding
 
 include("MultiHeadAttention.jl")
-export MultiHeadAttention
+export MultiHeadAttention, MultiHeadAttentionKVCache
 
 include("aggregate_layer.jl")
 export MeanLayer, FlattenLayer
