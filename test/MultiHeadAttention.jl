@@ -32,3 +32,34 @@ using Test
     y, scores = mha(x, x, x)
     @test size(y) == (13, 10, 5)
 end
+
+@testset "MultiHeadAttentionKVCache" begin
+    nhead, dim_model, dim_out = 4, 32, 13
+    max_batch_size = 8
+    max_seq_length = 16
+    mha = TransformersLite.MultiHeadAttentionKVCache(
+        nhead,
+        Dense(dim_model, dim_model; bias=false),
+        Dense(dim_model, dim_model; bias=false),
+        Dense(dim_model, dim_model; bias=false),
+        Dense(dim_model, dim_out),
+        Array{Float32, 3}(undef, dim_model, max_seq_length, max_batch_size),
+        Array{Float32, 3}(undef, dim_model, max_seq_length, max_batch_size),
+    )
+    # Fill cache
+    X = randn(Float32, 32, 10, 5)
+    mask = make_causal_mask(ones(10, 10))
+    A, scores = mha(X, X, X; mask=mask, start_pos=1, use_cache=true)
+    @test size(A) == (13, 10, 5)
+
+    # Use cache
+    x = randn(Float32, 32, 1, 5)
+    X = cat(X, x, dims=2)
+    mask = make_causal_mask(ones(11, 11))
+    AX, scoresX = mha(X, X, X; mask=mask, start_pos=1, use_cache=false)
+    mask = repeat([true], inner=(11, 1))
+    Ax, scoresx = mha(x, x, x; mask=mask, start_pos=11, use_cache=true)
+    @test size(AX) == (13, 11, 5)
+    @test size(Ax) == (13, 1, 5)
+    @test isapprox(AX[:, end, :], Ax[:, end, :])
+end

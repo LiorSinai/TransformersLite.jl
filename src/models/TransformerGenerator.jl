@@ -16,14 +16,20 @@ end
 
 Flux.@layer :ignore TransformerGenerator trainable=(embedding, position_encoding, blocks, dropout, head)
 
-function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
-    A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
+function (t::TransformerGenerator)(
+    x::A
+    ; mask::M=t.mask, start_pos::Int=1, use_cache::Bool=false
+    ) where {A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     N = size(x, 2)
-    x = x .+ t.position_encoding(1:N) # (dm, N, B)
+    if use_cache
+        x = x.+= t.position_encoding(start_pos:(start_pos + N - 1))
+    else
+        x = x .+ t.position_encoding(1:N) # (dm, N, B)
+    end
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
-        x = block(x; mask=mask)     # (dm, N, B)
+        x = block(x; mask=mask, start_pos=start_pos, use_cache=use_cache) # (dm, N, B)
     end
     x = t.head(x)                   # (vocab_size, N, B)
     x
@@ -52,6 +58,23 @@ function generate(
     context
 end
 
+function generate_with_cache(
+    rng::AbstractRNG, model::TransformerGenerator, context::AbstractMatrix{T}
+    ; max_tokens::Int=size(model.mask, 2),
+    ) where T
+    for i in 1:max_tokens
+        context_end = context[i:i, :]
+        mask = isnothing(model.mask) ? nothing : view(model.mask, 1:1, 1:1)
+        logits = model(context_end; mask=mask, start_pos=i, use_cache=true) |> cpu # (vocab_size, n, B)
+        # only focus on the last token
+        # This means that some of the work done in the last block and in model.head is discarded
+        logits = logits[:, end, :] # (vocab_size, B) 
+        context_next = multinomial_sampling(rng, logits)
+        context = cat(context, transpose(context_next); dims=1) 
+    end
+    context
+end
+
 function generate(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
     generate(Random.default_rng(), model, context; kwargs...)
 end
@@ -60,6 +83,17 @@ function multinomial_sampling(rng::AbstractRNG, logits::AbstractMatrix)
     probs = softmax(logits; dims=1)
     tokens = [sample(rng, Weights(p)) for p in eachcol(probs)]
     tokens
+end
+
+function clone_add_kv_cache(model::TransformerGenerator, max_seq_length::Int, max_batch_size::Int)
+    TransformerGenerator(
+        deepcopy(model.embedding),
+        deepcopy(model.position_encoding),
+        deepcopy(model.dropout),
+        [clone_add_kv_cache(b, max_seq_length, max_batch_size) for b in model.blocks],
+        deepcopy(model.head),
+        deepcopy(model.mask),
+    )
 end
 
 ## Show

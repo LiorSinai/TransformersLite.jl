@@ -1,5 +1,5 @@
 struct TransformerBlock{
-    MHA<:MultiHeadAttention,
+    MHA<:Union{MultiHeadAttention, MultiHeadAttentionKVCache},
     N1<:LayerNorm,
     D1<:Dense,
     D2<:Dense,
@@ -46,9 +46,14 @@ TransformerBlock(
     Dropout(pdrop),
 )
 
-function (t::TransformerBlock)(x::A; mask::M=nothing) where {
+function (t::TransformerBlock)(
+    x::A
+    ; mask::M=nothing, start_pos::Int=1, use_cache::Bool=false
+    ) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractArray{Bool}}}
-    h, scores = t.multihead_attention(x, x, x; mask=mask) # (dm, N, B)
+    h, scores = t.multihead_attention(
+        x, x, x; mask=mask, start_pos=start_pos, use_cache=use_cache
+        ) # (dm, N, B)
     h = t.dropout(h) 
     h = x + h
     h = t.norm_attention(h)            # (dm, N, B)
@@ -58,6 +63,17 @@ function (t::TransformerBlock)(x::A; mask::M=nothing) where {
     h = h + hff
     h = t.norm_feedforward(h)          # (dm, N, B)
     h
+end
+
+function clone_add_kv_cache(block::TransformerBlock, max_seq_length::Int, max_batch_size::Int)
+    TransformerBlock(
+        clone_add_kv_cache(block.multihead_attention, max_seq_length, max_batch_size),
+        deepcopy(block.norm_attention),
+        deepcopy(block.dense1),
+        deepcopy(block.dense2),
+        deepcopy(block.norm_feedforward),
+        deepcopy(block.dropout),
+    )
 end
 
 ## Show
@@ -71,4 +87,3 @@ function Base.show(io::IO, block::TransformerBlock)
     print(io, ", ", block.norm_feedforward)
     print(io, ")")
 end
-
