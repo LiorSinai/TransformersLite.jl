@@ -38,7 +38,9 @@ function MultiHeadAttention(
 end
 
 function (mha::MultiHeadAttention)(
-    query::A3, key::A3, value::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
+    query::A3, key::A3, value::A3
+    ; start_pos::Int=1, use_cache::Bool=false, kwargs...
+    ) where {T, A3 <: AbstractArray{T, 3}}
     # batch multiplication version. Input is dm × N × B
     #size(Q) == (dh*nhead, N, B)
     Q = mha.denseQ(query)
@@ -48,8 +50,10 @@ function (mha::MultiHeadAttention)(
     mha.denseO(A), scores
 end
 
-function (mha::MultiHeadAttention)(query::A2, key::A2, value::A2
-    ; kwargs...) where {T, A2 <: AbstractMatrix{T}}
+function (mha::MultiHeadAttention)(
+    query::A2, key::A2, value::A2
+    ; kwargs...
+    ) where {T, A2 <: AbstractMatrix{T}}
     # single sample. Make it a batch of 1
     query = reshape(query, size(query, 1), size(query, 2), 1)
     key = reshape(key, size(key, 1), size(key, 2), 1)
@@ -79,6 +83,92 @@ function Flux._big_show(io::IO, mha::MultiHeadAttention, indent::Int=0)
     Flux._layer_show(io, mha.denseK, inner_indent, "denseK")
     Flux._layer_show(io, mha.denseV, inner_indent, "denseV")
     Flux._layer_show(io, mha.denseO, inner_indent, "denseO")
+    print(io, " "^indent, ")")
+    if indent == 0
+        Flux._big_finale(io, mha)
+    else 
+        println(io, ",")
+    end
+end
+
+# With KV Cache
+struct MultiHeadAttentionKVCache{
+    Q<:Dense, K<:Dense, V<:Dense, O<:Dense, C<:Array{T, 3}  where T
+    }
+    nhead::Int
+    denseQ::Q
+    denseK::K
+    denseV::V
+    denseO::O
+    cache_k::C
+    cache_v::C
+end
+
+Flux.@layer :ignore MultiHeadAttentionKVCache trainable=(denseQ, denseK, denseV, denseO)
+
+function (mha::MultiHeadAttentionKVCache)(
+    query::A3, key::A3, value::A3
+    ; start_pos::Int=1, use_cache::Bool=true, kwargs...
+    ) where {T, A3 <: AbstractArray{T, 3}}
+    # batch multiplication version. Input is dm × N × B
+    #size(q) == (dm, dq, B)
+    q = mha.denseQ(query)
+    k = mha.denseK(key)
+    v = mha.denseV(value)
+    # size(K) == size(V) == (dim, end_pos, B)
+    if use_cache
+        dim, seq_length, batch_dim = size(query)
+        end_pos = start_pos + seq_length - 1
+        mha.cache_k[:, start_pos:end_pos, 1:batch_dim] = k
+        mha.cache_v[:, start_pos:end_pos, 1:batch_dim] = v
+        K = mha.cache_k[:, 1:end_pos, 1:batch_dim]
+        V = mha.cache_v[:, 1:end_pos, 1:batch_dim]
+    else
+        K = k
+        V = v
+    end
+    A, scores = multi_head_scaled_dot_attention(mha.nhead, q, K, V; kwargs...)
+    mha.denseO(A), scores
+end
+
+function (mha::MultiHeadAttentionKVCache)(
+    query::A2, key::A2, value::A2
+    ; kwargs...
+    ) where {T, A2 <: AbstractMatrix{T}}
+    # single sample. Make it a batch of 1
+    query = reshape(query, size(query, 1), size(query, 2), 1)
+    key = reshape(key, size(key, 1), size(key, 2), 1)
+    value = reshape(value, size(value, 1), size(value, 2), 1)
+    A, scores = mha(query, key, value; kwargs...)
+    reshape(A, size(A, 1), size(A, 2)), reshape(scores, size(scores)[1:3]...)
+end
+
+function clone_add_kv_cache(mha::MultiHeadAttention, max_seq_length::Int, max_batch_size::Int)
+    dkv = size(mha.denseK.weight, 1)
+    T = eltype(mha.denseK.weight)
+    cache_k = Array{T, 3}(undef, dkv, max_seq_length, max_batch_size)
+    cache_v = Array{T, 3}(undef, dkv, max_seq_length, max_batch_size)
+    MultiHeadAttentionKVCache(
+        mha.nhead,
+        deepcopy(mha.denseQ),
+        deepcopy(mha.denseK),
+        deepcopy(mha.denseV),
+        deepcopy(mha.denseO),
+        cache_k,
+        cache_v,
+    )
+end
+
+function Flux._big_show(io::IO, mha::MultiHeadAttentionKVCache, indent::Int=0)
+    inner_indent = indent + 2
+    print(io, " "^indent, "MultiHeadAttention(\n") 
+    println(io, " "^inner_indent, "nhead=$(mha.nhead),")
+    Flux._layer_show(io, mha.denseQ, inner_indent, "denseQ")
+    Flux._layer_show(io, mha.denseK, inner_indent, "denseK")
+    Flux._layer_show(io, mha.denseV, inner_indent, "denseV")
+    Flux._layer_show(io, mha.denseO, inner_indent, "denseO")
+    Flux._layer_show(io, mha.cache_k, inner_indent, "cache_k")
+    Flux._layer_show(io, mha.cache_v, inner_indent, "cache_v")
     print(io, " "^indent, ")")
     if indent == 0
         Flux._big_finale(io, mha)
