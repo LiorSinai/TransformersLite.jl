@@ -1,6 +1,6 @@
 using TransformersLite
 using TransformersLite: make_causal_mask
-using Flux: pullback
+using Flux: Dense, pullback
 using Test
 
 @testset "MultiHeadAttention" begin

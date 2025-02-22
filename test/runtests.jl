@@ -7,6 +7,7 @@ using TransformersLite
     include("mul4d.jl")
     include("attention.jl")
     include("MultiHeadAttention.jl")
+    include("MultiHeadLatentAttention.jl")
     include("block.jl")
     include("classifier.jl")
     include("generator.jl")
