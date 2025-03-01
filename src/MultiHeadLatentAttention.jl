@@ -17,7 +17,7 @@ struct MultiHeadLatentAttention{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} 
     cache_ckv::A
 end
 
-Flux.@layer MultiHeadLatentAttention
+Flux.@layer MultiHeadLatentAttention trainable=(denseDQ, denseUQ, denseDKV, denseUK, denseUV, denseO, norm_cq, norm_ckv)
 
 function MultiHeadLatentAttention(;
     nhead::Int, dim_in::Int, dim_head::Int, dim_lora, dim_out::Int,
