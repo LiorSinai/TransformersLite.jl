@@ -18,11 +18,11 @@ using Test
 end
 
 @testset "MultiHeadLatentAttention" begin
-    nhead, dim_head, dim_lora, dim_out = 2, 4, 7, 9
+    nhead, dim_head, dim_rope, dim_lora, dim_out = 2, 4, 4, 7, 9
     dim_model = nhead * dim_head
     N, max_seq_length, batch_dim = 10, 16, 3
     mla = MultiHeadLatentAttention(
-        nhead=nhead, dim_in=dim_model, dim_head=div(dim_model, nhead),
+        nhead=nhead, dim_in=dim_model, dim_head=dim_head, dim_rope=dim_rope,
         dim_lora=dim_lora, dim_out=dim_out,
         max_seq_length=max_seq_length, max_batch_size=batch_dim
         )

@@ -7,6 +7,7 @@ using TransformersLite
     include("position_encoding.jl")
     include("mul4d.jl")
     include("attention.jl")
+    include("RoPE.jl")
     include("MultiHeadAttention.jl")
     include("MultiHeadLatentAttention.jl")
     include("block.jl")
