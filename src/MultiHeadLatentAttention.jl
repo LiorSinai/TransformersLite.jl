@@ -101,10 +101,7 @@ function mla_naive(
     end_pos = start_pos + seq_length - 1
     cq = mla.norm_cq(mla.denseDQ(key))      # size(cq) == (dc, dq, B)
     ckv = mla.norm_ckv(mla.denseDKV(query)) # size(ckv) == (dc, dkv, B)
-    kr = mla.embedding(mla.denseKR(key), start_pos:end_pos) # size(kr) == (dr, dkv, B)
-    qr = mla.denseQR(cq)
-    qr = permutedims(reshape(qr, :, mla.nhead, size(qr, 2), batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
-    qr = mla.embedding(qr, start_pos:end_pos)
+    kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     if use_cache
         mla.cache_ckv[:, start_pos:end_pos, 1:batch_dim] = ckv
         mla.cache_kr[:, start_pos:end_pos, 1:batch_dim] = kr
@@ -118,6 +115,16 @@ function mla_naive(
     A_naive, scores_naive = multi_head_scaled_dot_attention(mla.nhead, Q, K, V; mask=mask)
     A_naive = mla.denseO(A_naive)
     A_naive, scores_naive
+end
+
+function _apply_embeddings(mla::MultiHeadLatentAttention, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
+    dim_lora, dq, batch_dim = size(cq)
+    kr = mla.denseKR(key)
+    qr = mla.denseQR(cq)
+    kr = mla.embedding(kr, idx) # size(kr) == (dr, dkv, B)
+    qr = permutedims(reshape(qr, :, mla.nhead, dq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
+    qr = mla.embedding(qr, idx)
+    kr, qr
 end
 
 function _cat_decoupled_embedding(nhead::Int, Qin::A3, Qr::A4, Kin::A3, kr::A3) where {T, A3 <: AbstractArray{T, 3}, A4 <: AbstractArray{T, 4}}
@@ -144,7 +151,7 @@ function mla_absorb(
     dh = div(dm, mla.nhead)
     cq = mla.norm_cq(mla.denseDQ(key))      # size(cq) == (dc, dq, B)
     ckv = mla.norm_ckv(mla.denseDKV(query)) # size(ckv) == (dc, dkv, B)
-    kr = mla.embedding(mla.denseKR(key), start_pos:end_pos) # size(kr) == (dr, dkv, B)
+    kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     dr = size(kr, 1)
     if use_cache
         mla.cache_ckv[:, start_pos:end_pos, 1:batch_dim] = ckv
@@ -158,9 +165,6 @@ function mla_absorb(
     keyT = permutedims(ckv_, (2, 1, 3, 4)) # (dkv, dc, B) => (dkv, dc, 1, B)
     cq_ = Flux.unsqueeze(cq, dims=3) # (dkv, dc, B) => (dkv, dc, 1, B)
     W_KQ = Flux.unsqueeze(mla.W_KQ, dims=4); # (dc, dc, nhead) => (dc, dc, nhead, 1)
-    qr = mla.denseQR(cq)
-    qr = permutedims(reshape(qr, :, mla.nhead, dq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
-    qr = mla.embedding(qr, start_pos:end_pos)
     krT = Flux.unsqueeze(permutedims(kr, (2, 1, 3)), dims=3) # (dr, dkv, B) => (dkv, dr, 1, 1B)
     atten_base = broadcasted_batched_mul(keyT, broadcasted_batched_mul(W_KQ, cq_))
     atten_embed = broadcasted_batched_mul(krT, qr)
