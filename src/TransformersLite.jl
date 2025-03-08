@@ -19,18 +19,18 @@ export mul4d
 export scaled_dot_attention, multi_head_scaled_dot_attention
 
 ## Layers
-include("Embed/tokenizer.jl")
-include("Embed/position_encoding.jl")
+include("embedding/tokenizer.jl")
+include("embedding/position_encoding.jl")
 export IndexTokenizer, encode, decode
 export PositionEncoding
 
-include("MultiHeadAttention.jl")
+include("layers/MultiHeadAttention.jl")
 export MultiHeadAttention
 
-include("aggregate_layer.jl")
+include("layers/aggregate_layer.jl")
 export MeanLayer, FlattenLayer
 
-include("block.jl")
+include("layers/block.jl")
 export TransformerBlock
 
 ## Models
