@@ -31,5 +31,9 @@ using TransformersLite: RoPE
         x = rand(Float32, dim, seq_length, nhead, batch_size);
         rx = r(x)
         @test size(rx) ==  (8, 5, 2, 3)
+
+        x = rand(Float32, dim, 3, nhead, batch_size);
+        rx = r(x, 3:5)
+        @test size(rx) ==  (8, 3, 2, 3)
     end
 end
