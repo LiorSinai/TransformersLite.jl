@@ -31,8 +31,9 @@ export RoPE, apply_rope
 
 
 include("layers/MultiHeadAttention.jl")
-include("MultiHeadLatentAttention.jl")
-export MultiHeadAttention, MultiHeadAttentionKVCache, MultiHeadLatentAttention
+include("MultiHeadLatentAttentionV2.jl")
+export MultiHeadAttention, MultiHeadAttentionKVCache
+export MultiHeadLatentAttentionV2
 
 include("layers/aggregate_layer.jl")
 export MeanLayer, FlattenLayer
