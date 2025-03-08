@@ -17,11 +17,11 @@ using Test
     @test z1 == z2
 end
 
-@testset "MultiHeadLatentAttention" begin
+@testset "MultiHeadLatentAttentionV2" begin
     nhead, dim_head, dim_rope, dim_lora, dim_out = 2, 4, 4, 7, 9
     dim_model = nhead * dim_head
     N, max_seq_length, batch_dim = 10, 16, 3
-    mla = MultiHeadLatentAttention(
+    mla = MultiHeadLatentAttentionV2(
         nhead=nhead, dim_in=dim_model, dim_head=dim_head, dim_rope=dim_rope,
         dim_lora=dim_lora, dim_out=dim_out,
         max_seq_length=max_seq_length, max_batch_size=batch_dim

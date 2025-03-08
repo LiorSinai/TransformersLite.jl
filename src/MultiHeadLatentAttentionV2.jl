@@ -1,6 +1,31 @@
 using Flux
 
-struct MultiHeadLatentAttention{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} where T, R} 
+"""
+    MultiHeadLatentAttentionV2(;
+    nhead, dim_in, dim_head, dim_lora, dim_out, dim_rope,
+    max_seq_length, max_batch_size, norm_layer=RMSNorm
+    )
+
+DeepSeek's Multi-Head Latent Attention with decoupled RoPE and weight absorption.
+
+The forward pass calculates:
+```math
+  Q = W^UQ * norm_cq(W^DQ * query)
+    ckv = norm_ckv(W^DK * key)
+    K = W^UK * ckv
+    V = W^UV * ckv
+    kr = embedding(W^KR * key, idx)
+    qr = embedding(W^QR * query, idx)
+    Q = cat(Q, qr)
+    K = cat(K, kr)
+    scores = 1/sqrt(dh+dr) * (K^T * Q) .* mask
+    A = V * scores
+    W^O * A, scores
+```
+
+Reference: https://arxiv.org/abs/2405.04434
+"""
+struct MultiHeadLatentAttentionV2{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} where T, R} 
     nhead::Int
     denseDQ::D1
     denseUQ::D1
@@ -23,9 +48,9 @@ struct MultiHeadLatentAttention{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} 
     cache_kr::A
 end
 
-Flux.@layer MultiHeadLatentAttention trainable=(denseDQ, denseUQ, denseDKV, denseUK, denseUV, denseO, norm_cq, norm_ckv, embedding, denseQR, denseKR)
+Flux.@layer MultiHeadLatentAttentionV2 trainable=(denseDQ, denseUQ, denseDKV, denseUK, denseUV, denseO, norm_cq, norm_ckv, embedding, denseQR, denseKR)
 
-function MultiHeadLatentAttention(;
+function MultiHeadLatentAttentionV2(;
     nhead::Int, dim_in::Int, dim_head::Int, dim_lora, dim_out::Int, dim_rope::Int,
     max_seq_length::Int, max_batch_size::Int, norm_layer=RMSNorm
     )
@@ -51,7 +76,7 @@ function MultiHeadLatentAttention(;
     T = eltype(denseDKV.weight)
     cache_ckv = Array{T, 3}(undef, dim_lora, max_seq_length, max_batch_size)
     cache_kr = Array{T, 3}(undef, dim_rope, max_seq_length, max_batch_size)
-    MultiHeadLatentAttention(
+    MultiHeadLatentAttentionV2(
         nhead,
         denseDQ, denseUQ,
         denseDKV, denseUK, denseUV,
@@ -89,18 +114,18 @@ function _absorb_WO_WUV(nhead::Int, W_O::AbstractMatrix, W_UV::AbstractMatrix)
     reshape(W_OVh, dout, dim_lora*nhead) # (dout, dc, nhead) => (dout, dc*nhead)
 end
 
-function (mla::MultiHeadLatentAttention)(query::A3, key::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
+function (mla::MultiHeadLatentAttentionV2)(query::A3, key::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
     mla_naive(mla, query, key; kwargs...) # this is faster than the absorb
 end
 
 function mla_naive(
-    mla::MultiHeadLatentAttention, query::A3, key::A3
+    mla::MultiHeadLatentAttentionV2, query::A3, key::A3
     ; start_pos::Int=1, use_cache::Bool=true, mask::Union{Nothing, M}=nothing
     ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
-    cq = mla.norm_cq(mla.denseDQ(key))      # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(query)) # size(ckv) == (dc, dkv, B)
+    cq = mla.norm_cq(mla.denseDQ(query))   # size(cq) == (dc, dq, B)
+    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     if use_cache
         mla.cache_ckv[:, start_pos:end_pos, 1:batch_dim] = ckv
@@ -112,12 +137,11 @@ function mla_naive(
     V = mla.denseUV(ckv) # size(v) == (dh*nhead, dkv, B)
     Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, dq, B)
     Q, K = _cat_decoupled_embedding(mla.nhead, Q, qr, K, kr)
-    A_naive, scores_naive = multi_head_scaled_dot_attention(mla.nhead, Q, K, V; mask=mask)
-    A_naive = mla.denseO(A_naive)
-    A_naive, scores_naive
+    A, scores = multi_head_scaled_dot_attention(mla.nhead, Q, K, V; mask=mask)
+    mla.denseO(A), scores
 end
 
-function _apply_embeddings(mla::MultiHeadLatentAttention, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
+function _apply_embeddings(mla::MultiHeadLatentAttentionV2, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
     dim_lora, dq, batch_dim = size(cq)
     kr = mla.denseKR(key)
     qr = mla.denseQR(cq)
@@ -141,7 +165,7 @@ function _cat_decoupled_embedding(nhead::Int, Qin::A3, Qr::A4, Kin::A3, kr::A3) 
 end
 
 function mla_absorb(
-    mla::MultiHeadLatentAttention, query::A3, key::A3
+    mla::MultiHeadLatentAttentionV2, query::A3, key::A3
     ; start_pos::Int=1, use_cache::Bool=true, mask::Union{Nothing, M}=nothing
     ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
     # batch multiplication version. Input is dm × N × nhead*B
@@ -149,8 +173,8 @@ function mla_absorb(
     end_pos = start_pos + seq_length - 1
     dq = size(query, 2)
     dh = div(dm, mla.nhead)
-    cq = mla.norm_cq(mla.denseDQ(key))      # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(query)) # size(ckv) == (dc, dkv, B)
+    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
+    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     dr = size(kr, 1)
     if use_cache
