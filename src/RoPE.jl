@@ -20,22 +20,24 @@ Rm*X[:, m] = | cos(mθ₂)-sin(mθ₂)*im | .* | X[3, m] + X[4, m]*im |
              |         ⋮            |    |          ⋮           |
 ```
 """
-struct RoPE{T}
+struct RoPE{T, M <: AbstractMatrix{<:Complex{T}}}
     base::Int
     dim::Int
     seq_length::Int
-    freqs_complex::Matrix{Complex{T}}
+    freqs_complex::M
 end
+
+Flux.@layer RoPE trainable=()
 
 RoPE(dim::Int, max_seq_length::Int; base::Int=10_000) = RoPE(Float32, dim, max_seq_length; base=base)
 
 function RoPE(T::DataType, dim::Int, max_seq_length::Int; base::Int=10_000)
     @assert dim % 2 == 0 "Require even dim"
-    θ = 1 ./ (base .^ ((0:2:(dim - 2)) / dim))
+    θ = (1 ./ (base .^ ((0:2:(dim - 2)) / dim)))
     angles = θ * transpose(0:(max_seq_length-1))
-    freqs = map(x -> reverse(sincos(x)), angles)
+    freqs = map(x -> reverse(T.(sincos(x))), angles)
     freqs_complex = map(cs -> Complex(cs...), freqs)
-    RoPE{T}(base, dim, max_seq_length, freqs_complex)
+    RoPE(base, dim, max_seq_length, freqs_complex)
 end
 
 (r::RoPE)(x::AbstractArray) = apply_rope(x, r.freqs_complex[:, 1:size(x, 2)])
@@ -83,7 +85,7 @@ function apply_rope(x::AbstractArray{T}, freqs::AbstractMatrix{<:Tuple{T, T}}) w
 end
 
 function Base.show(io::IO, r::RoPE)
-    print(io, typeof(r), "(")
+    print(io, "RoPE(")
     print(io, "base=$(r.base)")
     print(io, ", dim=$(r.dim)")
     print(io, ", seq_length=$(r.seq_length)")
