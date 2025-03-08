@@ -3,7 +3,8 @@ using Flux
 """
     MultiHeadLatentAttentionV2(;
     nhead, dim_in, dim_head, dim_lora, dim_out, dim_rope,
-    max_seq_length, max_batch_size, norm_layer=RMSNorm
+    max_seq_length, max_batch_size,
+    norm_layer=RMSNorm, embedding_layer=RoPE
     )
 
 DeepSeek's Multi-Head Latent Attention with decoupled RoPE and weight absorption.
@@ -52,7 +53,7 @@ Flux.@layer MultiHeadLatentAttentionV2 trainable=(denseDQ, denseUQ, denseDKV, de
 
 function MultiHeadLatentAttentionV2(;
     nhead::Int, dim_in::Int, dim_head::Int, dim_lora, dim_out::Int, dim_rope::Int,
-    max_seq_length::Int, max_batch_size::Int, norm_layer=RMSNorm
+    max_seq_length::Int, max_batch_size::Int, norm_layer=RMSNorm, embedding_layer=RoPE
     )
     denseDQ = Dense(dim_in => dim_lora; bias=false) # dim_in => dim_head*nhead
     denseUQ = Dense(dim_lora => dim_head * nhead; bias=false)
@@ -64,7 +65,7 @@ function MultiHeadLatentAttentionV2(;
     norm_cq = norm_layer(dim_lora)
     norm_ckv = norm_layer(dim_lora)
     # embedding 
-    embedding = RoPE(dim_rope, max_seq_length)
+    embedding = embedding_layer(dim_rope, max_seq_length)
     denseQR = Dense(dim_lora => dim_rope * nhead; bias=false)
     denseKR = Dense(dim_in => dim_rope; bias=false)
     # W_KQ = (W_UK)^T * W_UQ
