@@ -1,8 +1,9 @@
 """
-    multi_head_scaled_dot_attention(nhead, query, key, value; mask=nothing)
+    multi_head_scaled_dot_attention(nhead, query, key, value[, embedding, q_idxs]; mask=nothing)
 
 Apply `scaled_dot_attention` in parallel across `nhead` heads. 
-Each array is shaped from `(dm, N, B)` to `(dh, N, nhead, B)` and scaled dot attention is applied 
+Each array is shaped from `(dm, N, B)` to `(dh, N, nhead, B)`.
+Then the embedding (if passed) and scaled dot attention are applied 
 independently along the batch dimensions of `nhead` and `B`.
 The result is then shaped back into an `(dm, N, B)` array.
 
@@ -20,6 +21,27 @@ function multi_head_scaled_dot_attention(nhead::Int, Q::A3, K::A3, V::A3
     K = permutedims(reshape(K, dhkq, nhead, ks[2], ks[3]), [1, 3, 2, 4]);
     V = permutedims(reshape(V, dhv, nhead, vs[2], vs[3]), [1, 3, 2, 4]);
     A, scores = scaled_dot_attention(Q, K, V; kwargs...)
+    #size(A) == (dh, N, nhead, B) => (dh, nhead, N, B) => (dm, N, B)
+    #size(scores) == (N, N, nhead, B)
+    A = permutedims(A, [1, 3, 2, 4])
+    A = reshape(A, :, size(A, 3), size(A, 4))
+    A, scores
+end
+
+function multi_head_scaled_dot_attention(nhead::Int, Q::A3, K::A3, V::A3, embedding, q_idxs::UnitRange{Int}
+    ; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
+    qs = size(Q)
+    ks = size(K)
+    vs = size(V)
+    dhkq = div(size(Q, 1), nhead)
+    dhv = div(size(V, 1), nhead)
+    #size(Q) == (dh*nhead, N, B) => (dh, nhead, N, B) => (dh, N, nhead, B)
+    Q = permutedims(reshape(Q, dhkq, nhead, qs[2], qs[3]), [1, 3, 2, 4]);
+    K = permutedims(reshape(K, dhkq, nhead, ks[2], ks[3]), [1, 3, 2, 4]);
+    V = permutedims(reshape(V, dhv, nhead, vs[2], vs[3]), [1, 3, 2, 4]);
+    Qr = embedding(Q, q_idxs) # this is needed if using KV caching
+    Kr = embedding(K)
+    A, scores = scaled_dot_attention(Qr, Kr, V; kwargs...)
     #size(A) == (dh, N, nhead, B) => (dh, nhead, N, B) => (dm, N, B)
     #size(scores) == (N, N, nhead, B)
     A = permutedims(A, [1, 3, 2, 4])
