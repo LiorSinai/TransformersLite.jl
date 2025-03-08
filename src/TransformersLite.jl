@@ -23,16 +23,15 @@ export scaled_dot_attention, multi_head_scaled_dot_attention
 include("embedding/tokenizer.jl")
 include("embedding/position_encoding.jl")
 include("embedding/RoPE.jl")
-include("normalise.jl")
+include("layers/normalise.jl")
 export IndexTokenizer, encode, decode
 export PositionEncoding
-export RMSNorm, rms_norm
 export RoPE, apply_rope
-
+export RMSNorm, rms_norm
 
 include("layers/MultiHeadAttention.jl")
-include("MultiHeadLatentAttention.jl")
-include("MultiHeadLatentAttentionV2.jl")
+include("layers/MultiHeadLatentAttention.jl")
+include("layers/MultiHeadLatentAttentionV2.jl")
 export MultiHeadAttention, MultiHeadAttentionKVCache
 export MultiHeadLatentAttention, MultiHeadLatentAttentionV2
 
