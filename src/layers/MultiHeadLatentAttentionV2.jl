@@ -158,7 +158,7 @@ function _cat_decoupled_embedding(nhead::Int, Qin::A3, Qr::A4, Kin::A3, kr::A3) 
     Q = reshape(
         cat(reshape(Qin, :, nhead, dq, B), permutedims(Qr, (1, 3, 2, 4)), dims=1),
         : , dq, B)
-    Kr = repeat(Flux.unsqueeze(kr, dims=2), outer=(1, 2, 1, 1))
+    Kr = repeat(Flux.unsqueeze(kr, dims=2), outer=(1, nhead, 1, 1))
     K = reshape(
         cat(reshape(Kin, :, nhead, dkv, B), reshape(Kr, :, nhead, dkv, B), dims=1),
         :, dkv, B)

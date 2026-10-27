@@ -17,16 +17,12 @@ end
 Flux.@layer :ignore TransformerGenerator trainable=(embedding, position_encoding, blocks, dropout, head)
 
 function (t::TransformerGenerator)(x::A
-    ; mask::M=crop_mask(t.mask, size(x, 1)),
-    start_pos::Int=1, use_cache::Bool=false
+    ; start_pos::Int=1, use_cache::Bool=false,
+    mask::M=crop_mask(t.mask, start_pos, start_pos + size(x, 1) - 1),
     ) where {A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     N = size(x, 2)
-    if use_cache
-        x = x.+= t.position_encoding(start_pos:(start_pos + N - 1))
-    else
-        x = x .+ t.position_encoding(1:N) # (dm, N, B)
-    end
+    x = x .+ t.position_encoding(start_pos:(start_pos + N - 1)) # (dm, N, B)
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
         x = block(x; mask=mask, start_pos=start_pos, use_cache=use_cache) # (dm, N, B)
@@ -36,13 +32,14 @@ function (t::TransformerGenerator)(x::A
 end
 
 """
-    crop_mask(mask, n)
+    crop_mask(mask, start_pos, end_pos)
 
-Return the top left `n×n` block of `mask`, so that a mask made for the full context
-can be used with shorter inputs.
+Return the block of `mask` for keys at positions `1:end_pos` and queries at positions `start_pos:end_pos`,
+so that a mask made for the full context can be used with shorter inputs and with a KV cache.
+Without a cache `start_pos == 1` and this is the top left `end_pos×end_pos` block.
 """
-crop_mask(::Nothing, ::Int) = nothing
-crop_mask(mask::AbstractMatrix, n::Int) = view(mask, 1:n, 1:n)
+crop_mask(::Nothing, ::Int, ::Int) = nothing
+crop_mask(mask::AbstractMatrix, start_pos::Int, end_pos::Int) = view(mask, 1:end_pos, start_pos:end_pos)
 
 """
     generate([rng,] transformer, context; context_size, max_tokens=100)
