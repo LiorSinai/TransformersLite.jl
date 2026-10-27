@@ -49,9 +49,16 @@ end
 Apply the complex product version of RoPE.
 """
 function apply_rope(x::AbstractArray{T}, freqs_complex::AbstractMatrix{<:Complex{T}}) where T
-    x_complex = reinterpret(Complex{T}, x)
+    # Pair rows (1, 2), (3, 4), ... as the real and imaginary parts of complex numbers.
+    # This is equivalent to reinterpret(Complex{T}, x) but Zygote can differentiate it.
+    x_pairs = reshape(x, 2, :, size(x)[2:end]...) # (2, dim/2, N, ...)
+    x_complex = complex.(selectdim(x_pairs, 1, 1), selectdim(x_pairs, 1, 2)) # (dim/2, N, ...)
     rx_complex = freqs_complex .* x_complex
-    T.(reinterpret(T, rx_complex))
+    rx_pairs = cat(
+        Flux.unsqueeze(real.(rx_complex), dims=1),
+        Flux.unsqueeze(imag.(rx_complex), dims=1);
+        dims=1) # (2, dim/2, N, ...)
+    reshape(rx_pairs, size(x))
 end
 
 """
