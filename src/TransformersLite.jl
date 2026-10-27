@@ -3,7 +3,7 @@ module TransformersLite
 using ChainRulesCore: @thunk
 using Flux
 using LinearAlgebra
-using NNlib: gather, softmax, batched_mul
+using NNlib: gather, softmax, batched_mul, batched_transpose
 using Random
 using StatsBase
 

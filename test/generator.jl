@@ -19,6 +19,15 @@ using Flux: pullback
     y = model(x)
     @test size(y) == (65, 16, 5)
 
+    # inputs shorter than the mask
+    x_short = rand(1:65, 8, 5)
+    y_short = model(x_short)
+    @test size(y_short) == (65, 8, 5)
+
+    # generate
+    context = generate(model, reshape([1], 1, 1); context_size=16, max_tokens=20)
+    @test size(context) == (21, 1)
+
     # gradients
     # use sum as a dummy loss function
     _, back = pullback(m->sum(m(x)), model) # dummy loss function

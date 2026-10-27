@@ -16,7 +16,7 @@ end
 
 Flux.@layer :ignore TransformerGenerator trainable=(embedding, position_encoding, blocks, dropout, head)
 
-function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
+function (t::TransformerGenerator)(x::A; mask::M=crop_mask(t.mask, size(x, 1))) where {
     A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     N = size(x, 2)
@@ -30,6 +30,15 @@ function (t::TransformerGenerator)(x::A; mask::M=t.mask) where {
 end
 
 """
+    crop_mask(mask, n)
+
+Return the top left `n×n` block of `mask`, so that a mask made for the full context
+can be used with shorter inputs.
+"""
+crop_mask(::Nothing, ::Int) = nothing
+crop_mask(mask::AbstractMatrix, n::Int) = view(mask, 1:n, 1:n)
+
+"""
     generate([rng,] transformer, context; context_size, max_tokens=100)
 
 Generate batches of tokens starting from a given context.
@@ -40,12 +49,10 @@ function generate(
     ) where T
     for i in 1:max_tokens
         context_crop = tail(context, context_size) # forget everything before the current context
-        n = size(context_crop, 1)
-        mask = isnothing(model.mask) ? nothing : view(model.mask, 1:n, 1:n)
-        logits = model(context_crop; mask=mask) |> cpu # (vocab_size, n, B)
+        logits = model(context_crop) # (vocab_size, n, B)
         # only focus on the last token
         # This means that some of the work done in the last block and in model.head is discarded
-        logits = logits[:, end, :] # (vocab_size, B) 
+        logits = logits[:, end, :] |> cpu # (vocab_size, B)
         context_next = multinomial_sampling(rng, logits)
         context = cat(context, transpose(context_next); dims=1) 
     end

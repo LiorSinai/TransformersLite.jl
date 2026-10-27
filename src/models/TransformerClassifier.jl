@@ -19,7 +19,7 @@ end
 Flux.@layer TransformerClassifier
 
 function (t::TransformerClassifier)(x::A; mask::M=nothing) where {
-    A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
+    A<:AbstractArray, M<:Union{Nothing, AbstractArray{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     N = size(x, 2)
     x = x .+ t.position_encoding(1:N) # (dm, N, B)

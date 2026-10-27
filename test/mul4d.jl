@@ -1,7 +1,7 @@
 using Test
 using TransformersLite: mul4d
 using Flux: pullback
-using NNlib: batched_mul
+using Flux: batched_mul
 
 @testset "mul4d" verbose=true begin
 @testset "forward" begin

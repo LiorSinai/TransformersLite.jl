@@ -19,7 +19,7 @@ Flux.@layer TransformerBlock
 """
     TransformerBlock(
         nhead, dim_model, dim_hidden
-        ; act=relu, mask=nothing, pdrop=0.1
+        ; act=relu, pdrop=0.1
     )
 
 Create a transfomer block based on "Attention is all you need" (https://arxiv.org/abs/1706.03762).
@@ -36,7 +36,7 @@ TransformerBlock(
     dim_model::Int,
     dim_hidden::Int;
     act=relu,
-    pdrop::Float64=0.1,
+    pdrop::Real=0.1,
     ) = TransformerBlock(
     MultiHeadAttention(nhead, dim_model, dim_model),
     LayerNorm(dim_model),

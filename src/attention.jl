@@ -16,13 +16,13 @@ function multi_head_scaled_dot_attention(nhead::Int, Q::A3, K::A3, V::A3
     dm = size(Q, 1)
     dh = div(dm, nhead)
     #size(Q) == (dh*nhead, N, B) => (dh, nhead, N, B) => (dh, N, nhead, B)
-    Q = permutedims(reshape(Q, dh, nhead, qs[2], qs[3]), [1, 3, 2, 4]);
-    K = permutedims(reshape(K, dh, nhead, ks[2], ks[3]), [1, 3, 2, 4]);
-    V = permutedims(reshape(V, dh, nhead, vs[2], vs[3]), [1, 3, 2, 4]);
+    Q = permutedims(reshape(Q, dh, nhead, qs[2], qs[3]), (1, 3, 2, 4));
+    K = permutedims(reshape(K, dh, nhead, ks[2], ks[3]), (1, 3, 2, 4));
+    V = permutedims(reshape(V, dh, nhead, vs[2], vs[3]), (1, 3, 2, 4));
     A, scores = scaled_dot_attention(Q, K, V; kwargs...)
     #size(A) == (dh, N, nhead, B) => (dh, nhead, N, B) => (dm, N, B)
     #size(scores) == (N, N, nhead, B)
-    A = permutedims(A, [1, 3, 2, 4])
+    A = permutedims(A, (1, 3, 2, 4))
     A = reshape(A, dm, size(A, 3), size(A, 4))
     A, scores
 end
@@ -35,8 +35,8 @@ Returns the transformed input sequence and the attention scores.
 
 If the inputs are matrices, the outputs are equivalent to:
 
-    scores = softmax(transpose(key) * query))
-    A = 1/sqrt(dh) * value * scores
+    scores = softmax(transpose(key) * query / sqrt(dh); dims=1)
+    A = value * scores
 
 along with masking if the `mask` is not `nothing`.
 
@@ -50,8 +50,9 @@ function scaled_dot_attention(
     ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
     # Input is (dh, N, nhead)
     dh = size(query, 1)
-    keyT = permutedims(key, (2, 1, 3)) # (dkv, dh, nhead)
-    atten = one(T)/convert(T, sqrt(dh)) .* batched_mul(keyT, query) # (dkv, dh, nhead)*(dh, dq, nhead) => (dkv, dq, nhead)
+    scale = T(1 / sqrt(dh))
+    keyT = batched_transpose(key) # (dkv, dh, nhead)
+    atten = scale .* batched_mul(keyT, query) # (dkv, dh, nhead)*(dh, dq, nhead) => (dkv, dq, nhead)
     atten = apply_mask(atten, mask) # (dkv, dq, nhead)
     scores = softmax(atten; dims=1) # (dkv, dq, nhead)
     batched_mul(value, scores), scores  # (dh, dkv, nhead)*(dkv, dq, nhead) => (dh, dq, nhead)
@@ -71,8 +72,9 @@ function scaled_dot_attention(
     ; mask::Union{Nothing, M}=nothing
     ) where {T, A2 <: AbstractMatrix{T}, M <: AbstractArray{Bool}}
     ## Matrix version for a single head. Input is (dh, N)
-    dh = size(query, 1) 
-    atten = one(T)/convert(T, sqrt(dh)) .* transpose(key) * query # (dkv, dh)*(dh, dq) => (dkv, dq)
+    dh = size(query, 1)
+    scale = T(1 / sqrt(dh))
+    atten = scale .* transpose(key) * query # (dkv, dh)*(dh, dq) => (dkv, dq)
     atten = apply_mask(atten, mask) # (dkv, dq)
     scores = softmax(atten; dims=1) # (dkv, dq)
     value * scores, scores          # (dh, dkv)*(dkv, dq) => (dh, dq)
