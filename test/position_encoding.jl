@@ -8,4 +8,6 @@ using Test
     @test size(z) == (8, 10)
     z2 = pe(1:10)
     @test z2 == z
+
+    @test_throws ErrorException PositionEncoding(5)
 end

@@ -30,4 +30,13 @@ using TransformersLite: decode
     words = decode(indexer, [1, 5, 4, 2, 3, 1, 1, 1])
     expected_words = ["[UNK]", "highly", "recommend", "this", "book", "[UNK]", "[UNK]", "[UNK]"]
     @test words == expected_words
+
+    ## out of range indices decode to the unknown symbol
+    @test decode(indexer, 0) == "[UNK]"
+    @test decode(indexer, length(indexer) + 1) == "[UNK]"
+
+    ## the input vocabulary is not mutated
+    vocab = ["aa", "bb"]
+    IndexTokenizer(vocab, "[UNK]")
+    @test vocab == ["aa", "bb"]
 end

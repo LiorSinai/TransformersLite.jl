@@ -17,7 +17,7 @@ struct IndexTokenizer{T}
     unkidx::Int
     function IndexTokenizer(vocab::Vector{T}, unksym::T) where T
         if !(unksym ∈ vocab)
-            pushfirst!(vocab, unksym)
+            vocab = vcat(unksym, vocab) # do not mutate the caller's vocabulary
             unkidx = 1
         else
             unkidx = findfirst(isequal(unksym), vocab)
@@ -66,7 +66,7 @@ end
 
 Decode indices to tokens.
 """
-decode(tokenizer::IndexTokenizer{T}, x::Int) where T = 0 <= x <= length(tokenizer) ? tokenizer.vocabulary[x] : tokenizer.unksym
+decode(tokenizer::IndexTokenizer{T}, x::Int) where T = 1 <= x <= length(tokenizer) ? tokenizer.vocabulary[x] : tokenizer.unksym
 
 function decode(tokenizer::IndexTokenizer{T}, seq::Vector{Int}) where T
     map(x->decode(tokenizer, x), seq)

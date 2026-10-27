@@ -1,12 +1,16 @@
 """
     PositionEncoding(dim_embedding::Int, max_length::Int=1000)
 
-A position encoding layer for a matrix of size `dim_embedding`. `max_len` is the maximum acceptable length of input.
+A position encoding layer for a matrix of size `dim_embedding`. `max_length` is the maximum acceptable length of input.
+`dim_embedding` must be even.
 
-For each a pair of rows `(2i, 2i+1)` and a position `k`, the encoding is calculated as:
+For each pair of rows `(2i + 1, 2i + 2)` with `i = 0, 1, ..., dim_embedding/2 - 1` and a position `pos = 1, 2, ..., max_length`,
+the encoding is calculated as:
 
-    W[2i, k] = sin(pos/(1e4^(2i/dim_embedding)))
-    W[2i + 1, k] = cos(pos/(1e4^(2i/dim_embedding)))
+    W[2i + 1, pos] = sin(pos/(1e4^(2i/dim_embedding)))
+    W[2i + 2, pos] = cos(pos/(1e4^(2i/dim_embedding)))
+
+Note that positions start at 1, whereas the original paper starts them at 0.
 
 """
 struct PositionEncoding{W <: AbstractArray}
@@ -21,6 +25,9 @@ function PositionEncoding(dim_embedding::Int, max_length::Int=1000)
 end
 
 function make_position_encoding(dim_embedding::Int, seq_length::Int, n::Int=10000)
+    if isodd(dim_embedding)
+        error("embedding dimension=$dim_embedding must be even")
+    end
     encoding = Matrix{Float32}(undef, dim_embedding, seq_length)
     for pos in 1:seq_length
         for row in 0:2:(dim_embedding - 1)

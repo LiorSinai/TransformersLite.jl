@@ -4,6 +4,7 @@ using TransformersLite
 @testset verbose = true "TransformersLite" begin
     include("utilities.jl")
     include("indexer.jl")
+    include("position_encoding.jl")
     include("mul4d.jl")
     include("attention.jl")
     include("MultiHeadAttention.jl")
