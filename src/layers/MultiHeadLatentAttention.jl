@@ -60,7 +60,7 @@ function MultiHeadLatentAttention(;
     embedding = embedding_layer(dim_head, max_seq_length)
     # cache
     T = eltype(denseDKV.weight)
-    cache_ckv = Array{T, 3}(undef, dim_lora, max_seq_length, max_batch_size)
+    cache_ckv = similar(denseDKV.weight, T, dim_lora, max_seq_length, max_batch_size)
     MultiHeadLatentAttention(
         nhead,
         denseDQ, denseUQ,
@@ -74,7 +74,7 @@ function MultiHeadLatentAttention(;
 end
 
 function (mla::MultiHeadLatentAttention)(query::A3, key::A3
-    ; start_pos::Int=1, use_cache::Bool=true, mask::Union{Nothing, M}=nothing
+    ; start_pos::Int=1, use_cache::Bool=false, mask::Union{Nothing, M}=nothing
     ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1

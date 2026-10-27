@@ -93,7 +93,7 @@ end
 
 # With KV Cache
 struct MultiHeadAttentionKVCache{
-    Q<:Dense, K<:Dense, V<:Dense, O<:Dense, C<:Array{T, 3}  where T
+    Q<:Dense, K<:Dense, V<:Dense, O<:Dense, C<:AbstractArray{T, 3}  where T
     }
     nhead::Int
     denseQ::Q
@@ -146,8 +146,9 @@ end
 function clone_add_kv_cache(mha::MultiHeadAttention, max_seq_length::Int, max_batch_size::Int)
     dkv = size(mha.denseK.weight, 1)
     T = eltype(mha.denseK.weight)
-    cache_k = Array{T, 3}(undef, dkv, max_seq_length, max_batch_size)
-    cache_v = Array{T, 3}(undef, dkv, max_seq_length, max_batch_size)
+    # similar puts the caches on the same device as the weights
+    cache_k = similar(mha.denseK.weight, T, dkv, max_seq_length, max_batch_size)
+    cache_v = similar(mha.denseV.weight, T, dkv, max_seq_length, max_batch_size)
     MultiHeadAttentionKVCache(
         mha.nhead,
         deepcopy(mha.denseQ),
