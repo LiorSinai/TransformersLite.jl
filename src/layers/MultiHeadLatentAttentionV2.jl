@@ -173,7 +173,7 @@ function mla_absorb(
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
     dq = size(query, 2)
-    dh = div(dm, mla.nhead)
+    dh = div(size(mla.denseUK.weight, 1), mla.nhead) # dim_head, which can differ from dim_in ÷ nhead
     cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
     ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
