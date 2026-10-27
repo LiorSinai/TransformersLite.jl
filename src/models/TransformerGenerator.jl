@@ -62,25 +62,45 @@ function generate(
     context
 end
 
+"""
+    generate_with_cache([rng,] transformer, context; max_tokens=100)
+
+Generate batches of tokens starting from a given context using a KV cache.
+The model must have caches, see `clone_add_kv_cache`.
+
+The whole context is passed through the model once to fill the cache.
+After that only the newest token is passed through the model at each step.
+Unlike `generate`, the context is never cropped, so the total length must fit in the cache.
+"""
 function generate_with_cache(
     rng::AbstractRNG, model::TransformerGenerator, context::AbstractMatrix{T}
-    ; max_tokens::Int=size(model.mask, 2),
+    ; max_tokens::Int=100,
     ) where T
+    total_length = size(context, 1) + max_tokens - 1
+    if !isnothing(model.mask) && total_length > size(model.mask, 1)
+        error("context length + max_tokens - 1 = $total_length exceeds maximum length of $(size(model.mask, 1))")
+    end
+    tokens = context # first pass fills the cache with the whole context
+    start_pos = 1
     for i in 1:max_tokens
-        context_end = context[i:i, :]
-        mask = isnothing(model.mask) ? nothing : view(model.mask, 1:1, 1:1)
-        logits = model(context_end; mask=mask, start_pos=i, use_cache=true) |> cpu # (vocab_size, n, B)
+        end_pos = start_pos + size(tokens, 1) - 1
+        logits = model(tokens; start_pos=start_pos, use_cache=true) # (vocab_size, n, B)
         # only focus on the last token
-        # This means that some of the work done in the last block and in model.head is discarded
-        logits = logits[:, end, :] # (vocab_size, B) 
+        logits = logits[:, end, :] |> cpu # (vocab_size, B)
         context_next = multinomial_sampling(rng, logits)
-        context = cat(context, transpose(context_next); dims=1) 
+        context = cat(context, transpose(context_next); dims=1)
+        tokens = reshape(context_next, 1, :) # (1, B)
+        start_pos = end_pos + 1
     end
     context
 end
 
 function generate(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
     generate(Random.default_rng(), model, context; kwargs...)
+end
+
+function generate_with_cache(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
+    generate_with_cache(Random.default_rng(), model, context; kwargs...)
 end
 
 function multinomial_sampling(rng::AbstractRNG, logits::AbstractMatrix)
