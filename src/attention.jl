@@ -1,15 +1,17 @@
 """
-    multi_head_scaled_dot_attention(nhead, query, key, value; mask=nothing)
+    multi_head_scaled_dot_attention(nhead, query, key, value; embedding=identity, mask=nothing)
 
-Apply `scaled_dot_attention` in parallel across `nhead` heads. 
-Each array is shaped from `(dm, N, B)` to `(dh, N, nhead, B)` and scaled dot attention is applied 
+Apply `scaled_dot_attention` in parallel across `nhead` heads.
+Each array is shaped from `(dm, N, B)` to `(dh, N, nhead, B)` and scaled dot attention is applied
 independently along the batch dimensions of `nhead` and `B`.
 The result is then shaped back into an `(dm, N, B)` array.
+
+The `embedding` is applied to the query and key of each head before the attention, for example `RoPE(dh, max_length)`.
 
 Returns the transformed input sequence and the attention scores.
 """
 function multi_head_scaled_dot_attention(nhead::Int, Q::A3, K::A3, V::A3
-    ; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
+    ; embedding=identity, kwargs...) where {T, A3 <: AbstractArray{T, 3}}
     qs = size(Q)
     ks = size(K)
     vs = size(V)
@@ -19,6 +21,8 @@ function multi_head_scaled_dot_attention(nhead::Int, Q::A3, K::A3, V::A3
     Q = permutedims(reshape(Q, dh, nhead, qs[2], qs[3]), (1, 3, 2, 4));
     K = permutedims(reshape(K, dh, nhead, ks[2], ks[3]), (1, 3, 2, 4));
     V = permutedims(reshape(V, dh, nhead, vs[2], vs[3]), (1, 3, 2, 4));
+    Q = embedding(Q) # (dh, N, nhead, B)
+    K = embedding(K) # (dh, N, nhead, B)
     A, scores = scaled_dot_attention(Q, K, V; kwargs...)
     #size(A) == (dh, N, nhead, B) => (dh, nhead, N, B) => (dm, N, B)
     #size(scores) == (N, N, nhead, B)
