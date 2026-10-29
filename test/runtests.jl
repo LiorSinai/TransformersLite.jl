@@ -6,6 +6,7 @@ using TransformersLite
     include("embedding/indexer.jl")
     include("embedding/position_encoding.jl")
     include("mul4d.jl")
+    include("batched_mul.jl")
     include("attention.jl")
     include("layers/MultiHeadAttention.jl")
     include("layers/block.jl")

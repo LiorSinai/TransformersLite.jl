@@ -1,9 +1,9 @@
 module TransformersLite
 
-using ChainRulesCore: @thunk
+using ChainRulesCore: @thunk, @non_differentiable
 using Flux
 using LinearAlgebra
-using NNlib: gather, softmax, batched_mul, batched_transpose
+using NNlib: gather, softmax, batched_mul, batched_mul!, batched_transpose
 using Random
 using StatsBase
 
@@ -14,18 +14,26 @@ import Flux: _big_show
 include("attention.jl")
 include("mask.jl")
 include("mul4d.jl")
+include("batched_mul.jl")
 include("tail.jl")
-export mul4d
+export mul4d, broadcasted_mul4d, broadcasted_batched_mul
 export scaled_dot_attention, multi_head_scaled_dot_attention
 
 ## Layers
 include("embedding/tokenizer.jl")
 include("embedding/position_encoding.jl")
+include("embedding/rope.jl")
+include("layers/normalise.jl")
 export IndexTokenizer, encode, decode
 export PositionEncoding
+export RoPE, apply_rope
+export RMSNorm, rms_norm
 
 include("layers/MultiHeadAttention.jl")
-export MultiHeadAttention
+include("layers/MultiHeadLatentAttention.jl")
+include("layers/MultiHeadLatentAttentionV2.jl")
+export MultiHeadAttention, MultiHeadAttentionKVCache
+export MultiHeadLatentAttention, MultiHeadLatentAttentionV2
 
 include("layers/aggregate_layer.jl")
 export MeanLayer, FlattenLayer
