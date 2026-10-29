@@ -1,9 +1,9 @@
 module TransformersLite
 
-using ChainRulesCore: @thunk
+using ChainRulesCore: @thunk, @non_differentiable
 using Flux
 using LinearAlgebra
-using NNlib: gather, softmax, batched_mul, batched_transpose
+using NNlib: gather, softmax, batched_mul, batched_mul!, batched_transpose
 using Random
 using StatsBase
 
@@ -14,7 +14,7 @@ import Flux: _big_show
 include("attention.jl")
 include("mask.jl")
 include("mul4d.jl")
-include("broadcasted_batched_mul.jl")
+include("batched_mul.jl")
 include("tail.jl")
 export mul4d, broadcasted_mul4d, broadcasted_batched_mul
 export scaled_dot_attention, multi_head_scaled_dot_attention

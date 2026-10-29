@@ -6,6 +6,7 @@ using TransformersLite
     include("indexer.jl")
     include("position_encoding.jl")
     include("mul4d.jl")
+    include("batched_mul.jl")
     include("attention.jl")
     include("RoPE.jl")
     include("MultiHeadAttention.jl")

@@ -3,21 +3,6 @@ using TransformersLite: make_causal_mask, mla_naive, mla_absorb
 using Flux: pullback
 using Test
 
-@testset "broadcasted_batched_mul" begin
-    x = rand(3, 2, 1, 3)
-    y = rand(2, 3, 2, 1)
-    z1 = broadcasted_batched_mul(x, y)
-    z2 = broadcasted_mul4d(x, y)
-    @test z1 == z2
-
-    # vector
-    x = rand(3, 1, 1, 3)
-    y = rand(1, 3, 2, 1)
-    z1 = broadcasted_batched_mul(x, y)
-    z2 = broadcasted_mul4d(x, y)
-    @test z1 == z2
-end
-
 @testset "MultiHeadLatentAttention" begin
     nhead, dim_head, dim_lora, dim_out = 2, 4, 7, 9
     dim_model = nhead * dim_head
