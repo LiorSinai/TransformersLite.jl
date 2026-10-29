@@ -3,15 +3,15 @@ using TransformersLite
 
 @testset verbose = true "TransformersLite" begin
     include("utilities.jl")
-    include("indexer.jl")
-    include("position_encoding.jl")
+    include("embedding/indexer.jl")
+    include("embedding/position_encoding.jl")
+    include("embedding/RoPE.jl")
     include("mul4d.jl")
     include("batched_mul.jl")
     include("attention.jl")
-    include("RoPE.jl")
-    include("MultiHeadAttention.jl")
-    include("MultiHeadLatentAttention.jl")
-    include("block.jl")
-    include("classifier.jl")
-    include("generator.jl")
+    include("layers/MultiHeadAttention.jl")
+    include("layers/MultiHeadLatentAttention.jl")
+    include("layers/block.jl")
+    include("models/classifier.jl")
+    include("models/generator.jl")
 end
