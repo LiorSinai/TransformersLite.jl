@@ -1,6 +1,6 @@
 struct TransformerGenerator{
     E<:Flux.Embedding, 
-    PE<:Union{Flux.Embedding, PositionEncoding}, 
+    PE<:Union{Flux.Embedding, PositionEncoding, ZeroPositionEncoding},
     DO<:Dropout, 
     TB<:Vector{<:TransformerBlock}, 
     D<:Dense,

@@ -19,7 +19,7 @@ Flux.@layer TransformerBlock
 """
     TransformerBlock(
         nhead, dim_model, dim_hidden
-        ; act=relu, pdrop=0.1
+        ; act=relu, pdrop=0.1, embedding=identity
     )
 
 Create a transfomer block based on "Attention is all you need" (https://arxiv.org/abs/1706.03762).
@@ -30,15 +30,17 @@ layer norms and residual connections.
 `dim_model` is the model dimension also known as the embedding layer dimension. 
 The input and output are both of size `dim_model`.     
 `dim_hidden` is the size of the hidden layer between the two dense layers.
+`embedding` is passed to the `MultiHeadAttention` layer. If using `RoPE`, use `dim=div(dim_model, nhead)`.
 """
 TransformerBlock(
     nhead::Int,
     dim_model::Int,
-    dim_hidden::Int;
-    act=relu,
+    dim_hidden::Int
+    ; act=relu,
     pdrop::Real=0.1,
+    embedding=identity,
     ) = TransformerBlock(
-    MultiHeadAttention(nhead, dim_model, dim_model),
+    MultiHeadAttention(nhead, dim_model, dim_model; embedding=embedding),
     LayerNorm(dim_model),
     Dense(dim_model, dim_hidden, act),
     Dense(dim_hidden, dim_model),

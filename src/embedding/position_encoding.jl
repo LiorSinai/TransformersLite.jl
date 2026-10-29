@@ -53,3 +53,17 @@ end
 function Base.show(io::IO, pe::PositionEncoding)
     print(io, "PositionEncoding($(size(pe.weight, 1)))")
 end
+
+"""
+    ZeroPositionEncoding()
+
+A position encoding which adds nothing to the embeddings, so that `x .+ pe(1:N) == x`.
+
+Use this when the positions are encoded inside the attention layers instead,
+for example with `TransformerBlock(...; embedding=RoPE(dim_head, max_length))`.
+"""
+struct ZeroPositionEncoding end
+
+(pe::ZeroPositionEncoding)(indices) = false # false is the additive identity for all number types
+
+Base.show(io::IO, pe::ZeroPositionEncoding) = print(io, "ZeroPositionEncoding()")

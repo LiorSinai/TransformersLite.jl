@@ -5,6 +5,7 @@ using TransformersLite
     include("utilities.jl")
     include("embedding/indexer.jl")
     include("embedding/position_encoding.jl")
+    include("embedding/rope.jl")
     include("mul4d.jl")
     include("attention.jl")
     include("layers/MultiHeadAttention.jl")

@@ -21,8 +21,10 @@ export scaled_dot_attention, multi_head_scaled_dot_attention
 ## Layers
 include("embedding/tokenizer.jl")
 include("embedding/position_encoding.jl")
+include("embedding/rope.jl")
 export IndexTokenizer, encode, decode
-export PositionEncoding
+export PositionEncoding, ZeroPositionEncoding
+export RoPE
 
 include("layers/MultiHeadAttention.jl")
 export MultiHeadAttention
