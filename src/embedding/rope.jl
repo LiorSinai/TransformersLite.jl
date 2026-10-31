@@ -1,23 +1,27 @@
 """
-    RoPE(dim, max_seq_length; base=10_000)
-Rotary Position Embeddings (RoPE) as proposed in 
-[RoFormer: Enhanced Transformer with Rotary Position Embedding (2021)][https://arxiv.org/abs/2104.09864].
+    RoPE([T=Float32,] dim, max_seq_length; base=10_000)
 
-Each column vector `X[:, m, ... ]` is multiplied by a rotation matrix `Rm` where 
+Rotary Position Embeddings (RoPE) as proposed in
+[RoFormer: Enhanced Transformer with Rotary Position Embedding (2021)](https://arxiv.org/abs/2104.09864).
+
+Consecutive pairs of features `(x[2i-1], x[2i])` are rotated by an angle proportional to their position `m`.
+That is, each column vector `X[:, m, ...]` is multiplied by a block diagonal rotation matrix `Rm` where
 ```
      | cos(mθ₁) -sin(mθ₁)   0          …       |
 Rm = | sin(mθ₁)  cos(mθ₁)   0          …       |
      |  0          0    cos(mθ₂) -sin(mθ₂)  …  |
      |  ⋮          ⋮        ⋮          ⋱       |
 ```
-
-So that the output is: `[R1*X[:, 1] R2*X[:, 2] … ]`
+with frequencies `θᵢ = base^(-2(i-1)/dim)` for `i = 1, …, dim/2`.
+These factors are precomputed for all positions in `freqs_complex`, a `(dim/2, max_seq_length)` matrix.
+The precomputed values are not trainable.
+Positions are 0-indexed so the output is `[X[:, 1] R1*X[:, 2] … ]`.
 
 This product can also be calculated with complex numbers:
 ```
-             | cos(mθ₁)-sin(mθ₁)*im |    | X[1, m] + X[2, m]*im |
-Rm*X[:, m] = | cos(mθ₂)-sin(mθ₂)*im | .* | X[3, m] + X[4, m]*im |
-             |         ⋮            |    |          ⋮           |
+             | cos(mθ₁) + sin(mθ₁)*im |    | X[1, m] + X[2, m]*im |
+Rm*X[:, m] = | cos(mθ₂) + sin(mθ₂)*im | .* | X[3, m] + X[4, m]*im |
+             |           ⋮            |    |          ⋮           |
 ```
 """
 struct RoPE{T, M <: AbstractMatrix{<:Complex{T}}}
@@ -47,6 +51,9 @@ end
     apply_rope(x, freqs_complex)
 
 Apply the complex product version of RoPE.
+
+`x` has size `(dim, N, ...)` and `freqs_complex` has size `(dim/2, N)`
+with `freqs_complex[i, m+1] = cis(mθᵢ)`. See `RoPE`.
 """
 function apply_rope(x::AbstractArray{T}, freqs_complex::AbstractMatrix{<:Complex{T}}) where T
     # Pair rows (1, 2), (3, 4), ... as the real and imaginary parts of complex numbers.
@@ -66,8 +73,11 @@ end
 
 Apply a real value product version of RoPE.
 
+`x` has size `(dim, N, ...)` and `freqs` is a `(dim/2, N)` matrix of tuples
+with `freqs[i, m+1] = (cos(mθᵢ), sin(mθᵢ))`. See `RoPE`.
+
 On a CPU this is comparable in speed to the complex version.
-However on a GPU it much slower because of scalar indexing.
+However on a GPU it is much slower because of scalar indexing.
 """
 function apply_rope(x::AbstractArray{T, 3}, freqs::AbstractMatrix{<:Tuple{T, T}}) where T
     Rx = similar(x)
