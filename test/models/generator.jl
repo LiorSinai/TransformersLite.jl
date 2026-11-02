@@ -36,8 +36,7 @@ using Flux: pullback
 end
 
 @testset "TransformerGenerator with RoPE" begin
-    dim_head = dim_model ÷ nhead
-    rope = RoPE(dim_head, 1000)
+    rope = RoPE(8, 1000)
     model = TransformersLite.TransformerGenerator(
         Embedding(65 => 32), # vocab_size is 65
         ZeroPositionEncoding(), # positions are encoded by RoPE in the attention layers
