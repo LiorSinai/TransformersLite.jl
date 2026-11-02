@@ -1,40 +1,49 @@
-struct MultiHeadAttention{Q<:Dense, K<:Dense, V<:Dense, O<:Dense}
+struct MultiHeadAttention{Q<:Dense, K<:Dense, V<:Dense, O<:Dense, E}
     nhead::Int
     denseQ::Q
     denseK::K
     denseV::V
     denseO::O
+    embedding::E
 end
 
 # tell Flux which parameters are trainable
 Flux.@layer :ignore MultiHeadAttention trainable=(denseQ, denseK, denseV, denseO)
 
 """
-    MultiHeadAttention(nhead, dim_in, [dim_head,] dim_out)
+    MultiHeadAttention(nhead, dim_in, [dim_head,] dim_out; embedding=identity)
 
-Multi-head dot product attention Layer. `nhead` is the number of heads, 
-`dim_in` is the input dimension size, `dim_head` is the size of each head, 
+Multi-head dot product attention Layer. `nhead` is the number of heads,
+`dim_in` is the input dimension size, `dim_head` is the size of each head,
 `dim_out` is the output size. If `dim_head` is not specified, it defaults to `dim_in ÷ nhead`.
+
+If `embedding` is of type `RoPE`, require `embedding.dim == dim_head`.
 """
 function MultiHeadAttention(
     nhead::Int, dim_in::Int, dim_head::Int, dim_out::Int
+    ; embedding=identity
     )
+    d_hidden = dim_head*nhead
+    if embedding isa RoPE && embedding.dim != dim_head
+        throw(ArgumentError("Require RoPE dim=dim_head=$(dim_head), got $(embedding.dim)"))
+    end
     MultiHeadAttention(
         nhead,
-        Dense(dim_in, dim_head*nhead; bias=false),
-        Dense(dim_in, dim_head*nhead; bias=false),
-        Dense(dim_in, dim_head*nhead; bias=false),
-        Dense(dim_head*nhead, dim_out),
+        Dense(dim_in, d_hidden; bias=false),
+        Dense(dim_in, d_hidden; bias=false),
+        Dense(dim_in, d_hidden; bias=false),
+        Dense(d_hidden, dim_out),
+        embedding,
     )
 end
 
 function MultiHeadAttention(
-    nhead::Int, dim_in::Int, dim_out::Int
+    nhead::Int, dim_in::Int, dim_out::Int; options...
     )
     if dim_in % nhead != 0 
         error("input dimension=$dim_in is not divisible by number of heads=$nhead")
     end
-    MultiHeadAttention(nhead, dim_in, div(dim_in, nhead), dim_out)
+    MultiHeadAttention(nhead, dim_in, div(dim_in, nhead), dim_out; options...)
 end
 
 function (mha::MultiHeadAttention)(
@@ -44,7 +53,7 @@ function (mha::MultiHeadAttention)(
     Q = mha.denseQ(query)
     K = mha.denseK(key)
     V = mha.denseV(value)
-    A, scores = multi_head_scaled_dot_attention(mha.nhead, Q, K, V; kwargs...)
+    A, scores = multi_head_scaled_dot_attention(mha.nhead, Q, K, V; embedding=mha.embedding, kwargs...)
     mha.denseO(A), scores
 end
 
@@ -67,7 +76,8 @@ function Base.show(io::IO, mha::MultiHeadAttention)
     print(io, "MultiHeadAttention(")
     print(io, "nhead=$(mha.nhead), ")
     print(io, "head_size=$(dh), ")
-    print(io, "$(dm)=>$(dout)")
+    print(io, "$(dm)=>$(dout), ")
+    print(io, "embedding=$(mha.embedding)")
     print(io, ")")
 end
 
@@ -79,6 +89,7 @@ function Flux._big_show(io::IO, mha::MultiHeadAttention, indent::Int=0)
     Flux._layer_show(io, mha.denseK, inner_indent, "denseK")
     Flux._layer_show(io, mha.denseV, inner_indent, "denseV")
     Flux._layer_show(io, mha.denseO, inner_indent, "denseO")
+    Flux._layer_show(io, mha.embedding, inner_indent, "embedding")
     print(io, " "^indent, ")")
     if indent == 0
         Flux._big_finale(io, mha)
