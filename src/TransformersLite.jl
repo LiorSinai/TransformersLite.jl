@@ -25,7 +25,7 @@ include("embedding/position_encoding.jl")
 include("embedding/rope.jl")
 include("layers/normalise.jl")
 export IndexTokenizer, encode, decode
-export PositionEncoding
+export PositionEncoding, ZeroPositionEncoding
 export RoPE, apply_rope
 export RMSNorm, rms_norm
 

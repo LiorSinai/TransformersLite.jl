@@ -138,7 +138,10 @@ function mla_naive(
     V = mla.denseUV(ckv) # size(v) == (dh*nhead, dkv, B)
     Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, dq, B)
     Q, K = _cat_decoupled_embedding(mla.nhead, Q, qr, K, kr)
-    A, scores = multi_head_scaled_dot_attention(mla.nhead, Q, K, V; mask=mask)
+    A, scores = multi_head_scaled_dot_attention(
+        mla.nhead, Q, K, V
+        ; mask=mask, embedding=identity # already applied embeddings
+    )
     mla.denseO(A), scores
 end
 

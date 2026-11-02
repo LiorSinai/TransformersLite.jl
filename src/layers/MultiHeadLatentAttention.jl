@@ -88,7 +88,8 @@ function (mla::MultiHeadLatentAttention)(query::A3, key::A3
     V = mla.denseUV(ckv) # size(v) == (dh*nhead, dkv, B)
     Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, dq, B)
     A, scores = multi_head_scaled_dot_attention(
-        mla.nhead, Q, K, V, mla.embedding, start_pos:end_pos; mask=mask
+        mla.nhead, Q, K, V, start_pos:end_pos
+        ; mask=mask, embedding=mla.embedding
     )
     mla.denseO(A), scores
 end
