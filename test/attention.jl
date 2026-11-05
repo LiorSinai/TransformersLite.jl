@@ -1,6 +1,6 @@
 using TransformersLite: multi_head_scaled_dot_attention, scaled_dot_attention, make_causal_mask
 using LinearAlgebra
-using Flux: pullback
+using Flux: pullback, gradient, unsqueeze
 
 @testset "attention" verbose=true begin
 
@@ -129,6 +129,42 @@ end
         (k, q, v) -> multi_head_scaled_dot_attention(3, k, q, v; mask=mask)[1]
         , key, query, value)
     @test_nowarn grads = pull(ones(size(A)))
+end
+
+@testset "absorbed_attention" begin
+    n, dc, nhead, B = 6, 5, 3, 4
+    Cq = randn(dc, n, B)
+    Ckv = randn(dc, n, B)
+    W_KQ = randn(dc, nhead, dc)
+    A1, scores1 = absorbed_attention(Cq, Ckv, W_KQ)
+    @test size(A1) == (dc, nhead, n, B) && size(scores1) == (n, n, nhead, B)
+    W2 = unsqueeze(permutedims(W_KQ, (1, 3, 2)), dims=4)
+    A2, scores2 = absorbed_attention_broadcasted(Cq, Ckv, W2)
+    @test size(A2) == (dc, n, nhead, B) && size(scores2) == (n, n, nhead, B)
+    A11 = permutedims(A1, (1, 3, 2, 4))
+    @test A11 ≈ A2 && scores1 ≈ scores2
+
+    # loss(f) = (Cq, CKv, W_KQ) -> sum(abs2, f(Cq, Ckv, W_KQ))
+    # grads1 = gradient(loss(absorbed_attention), Cq, Ckv, W_KQ)
+    # grads2 = gradient(loss(absorbed_attention_broadcasted), Cq, Ckv, W2)
+    # @test all(grads1 .≈ grads2)
+end
+
+@testset "absorbed_attention with decoupled embeddings" begin
+    n, dc, dr, nhead, B = 6, 5, 7, 3, 4
+    Cq = randn(dc, n, B)
+    Ckv = randn(dc, n, B)
+    W_KQ = randn(dc, nhead, dc)
+    Kr = randn(dr, n, B)
+    Qr = randn(dr, nhead * n, B)
+    A1, scores1 = absorbed_attention(Cq, Ckv, W_KQ, Kr, Qr)
+    @test size(A1) == (dc, nhead, n, B) && size(scores1) == (n, n, nhead, B)
+    W2 = unsqueeze(permutedims(W_KQ, (1, 3, 2)), dims=4)
+    Qr2 = permutedims(reshape(Qr, dr, nhead, n, B), (1, 3, 2, 4))
+    A2, scores2 = absorbed_attention_broadcasted(Cq, Ckv, W2, Kr, Qr2)
+    @test size(A2) == (dc, n, nhead, B) && size(scores2) == (n, n, nhead, B)
+    A11 = permutedims(A1, (1, 3, 2, 4))
+    @test A11 ≈ A2 && scores1 ≈ scores2
 end
 
 end

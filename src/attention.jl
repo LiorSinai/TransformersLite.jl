@@ -65,7 +65,6 @@ If the inputs are matrices, the outputs are equivalent to:
 
 along with masking if the `mask` is not `nothing`.
 
-
 If the inputs are 3D or 4D arrays, the above equations holds for each `A[:, :, k, l]` with inputs indexed at `X[:, :, k, l]` 
 where `X` is the `query`, `key` or `value`.
 """
@@ -76,11 +75,11 @@ function scaled_dot_attention(
     # Input is (dh, N, nhead)
     dh = size(query, 1)
     scale = T(1 / sqrt(dh))
-    keyT = batched_transpose(key) # (dkv, dhkq, nhead)
-    atten = scale .* batched_mul(keyT, query) # (dkv, dhkq, nhead)*(dhkq, dq, nhead) => (dkv, dq, nhead)
-    atten = apply_mask(atten, mask) # (dkv, dq, nhead)
-    scores = softmax(atten; dims=1) # (dkv, dq, nhead)
-    batched_mul(value, scores), scores  # (dhv, dkv, nhead)*(dkv, dq, nhead) => (dhv, dq, nhead)
+    keyT = batched_transpose(key)             # (dkv, dhkq, nhead)
+    atten = scale .* batched_mul(keyT, query) # (dkv, dq, nhead)
+    atten = apply_mask(atten, mask)           # (dkv, dq, nhead)
+    scores = softmax(atten; dims=1)           # (dkv, dq, nhead)
+    batched_mul(value, scores), scores        # (dhv, dq, nhead)
 end
 
 function scaled_dot_attention(query::A4, key::A4, value::A4; kwargs...) where {T, A4 <: AbstractArray{T, 4}}
@@ -100,7 +99,137 @@ function scaled_dot_attention(
     dh = size(query, 1)
     scale = T(1 / sqrt(dh))
     atten = scale .* transpose(key) * query # (dkv, dh)*(dh, dq) => (dkv, dq)
-    atten = apply_mask(atten, mask) # (dkv, dq)
-    scores = softmax(atten; dims=1) # (dkv, dq)
-    value * scores, scores          # (dh, dkv)*(dkv, dq) => (dh, dq)
+    atten = apply_mask(atten, mask)         # (dkv, dq)
+    scores = softmax(atten; dims=1)         # (dkv, dq)
+    value * scores, scores                  # (dh, dkv)*(dkv, dq) => (dh, dq)
+end
+
+"""
+    absorbed_attention(Cq, Ckv, W_KQ[, Kr, Qr]; mask=nothing)
+
+Latent attention with absorbed weights.
+Heads are placed between the feature and token dims so that a `reshape` merges them into a
+matrix dim.
+
+Inputs:
+- `Cq`: latent query `(dc, N, B)`.
+- `Ckv`: latent key-value `(dc, N, B)`.
+- `W_KQ`: absorbed weight `(dc, nhead, dc)`
+- `Kr`: latent embedding `(dr, N, B)`
+- `Qr`: latent embedding `(dr, H*N, B)`
+
+The outputs are equivalent to:
+
+    U = reshape(W_KQ, dc * nhead, dc) * reshape(Cq, dc, Nq * B),
+    U = reshape(U, dc, nhead * Nq, B)
+    scores = softmax(transpose(Ckv) * U / sqrt(dh); dims=1)
+    A = Ckv * scores
+
+along with masking if the `mask` is not `nothing`.
+"""
+function absorbed_attention(
+    Cq::AbstractArray{T, 3},
+    Ckv::AbstractArray{T, 3},
+    W_KQ::AbstractArray{T, 3},
+    ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
+    ) where {T, M <: AbstractArray{Bool}}
+    # Input is (dc, N, nhead)
+    dc, N, B = size(Cq)
+    nhead = size(W_KQ, 2)
+    U = reshape(W_KQ, dc * nhead, dc) * reshape(Cq, dc, N * B) # (dc*nhead, N*B)
+    CkvT = batched_transpose(Ckv)                               # (N, dc, nhead)
+    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * N, B))  # (N, nhead*N, B)
+    if !isnothing(mask)
+        atten = permutedims(reshape(atten, N, nhead, N, B), (1, 3, 2, 4))
+        atten = apply_mask(atten, mask)
+        atten = reshape(permutedims(atten, (1, 3, 2, 4)), N, :, B)
+    end
+    scores = softmax(atten; dims=1)
+    scores_out = permutedims(
+        reshape(scores, N, nhead, N, B), (1, 3, 2, 4))          # (N, N, nhead, B)
+    A = reshape(batched_mul(Ckv, scores), dc, nhead, N, B)      # (dc, nhead, N, B)
+    A, scores_out                        
+end
+
+# with decoupled embeddings
+function absorbed_attention(
+    Cq::AbstractArray{T, 3},
+    Ckv::AbstractArray{T, 3},
+    W_KQ::AbstractArray{T, 3},
+    Kr::AbstractArray{T, 3},
+    Qr::AbstractArray{T, 3},
+    ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
+    ) where {T, M <: AbstractArray{Bool}}
+    # Input is (dc, N, nhead)
+    dc, dq, B = size(Cq)
+    dc, dkv, B = size(Ckv)
+    nhead = size(W_KQ, 2)
+    U = reshape(W_KQ, dc * nhead, dc) * reshape(Cq, dc, dq * B) # (dc*nhead, dq*B)
+    CkvT = batched_transpose(Ckv)                               # (dkv, dc, nhead)
+    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * dq, B)) # (dkv, nhead*dq, B)
+    # embeddings
+    KrT = permutedims(Kr, (2, 1, 3))            # (dkv, dr, B)
+    atten_embed = scale .* batched_mul(KrT, Qr) # (dkv, nhead*dq, B)
+    atten += atten_embed
+    if !isnothing(mask)
+        atten = permutedims(reshape(atten, dkv, nhead, dq, B), (1, 3, 2, 4))
+        atten = apply_mask(atten, mask)
+        atten = reshape(permutedims(atten, (1, 3, 2, 4)), dkv, :, B)
+    end
+    scores = softmax(atten; dims=1)
+    scores_out = permutedims(
+        reshape(scores, dkv, nhead, dq, B), (1, 3, 2, 4))     # (dkv, dq, nhead, B)
+    A = reshape(batched_mul(Ckv, scores), dc, nhead, dq, B)
+    A, scores_out                        
+end
+
+"""
+    absorbed_attention_broadcasted(Cq, Ckv, W_KQ[, Kr, Qr]; mask=nothing, scale=one(T))
+
+Latent attention with broadcasting.
+
+Inputs:
+- `Cq`: latent query `(dc, N, B)`.
+- `Ckv`: latent key-value `(dc, N, B)`.
+- `W_KQ`: absorbed weight `(dc, dc, nhead, 1)`
+- `Kr`: latent embedding `(dr, N, B)`
+- `Qr`: latent embedding `(dr, N, H, B)`
+"""
+function absorbed_attention_broadcasted(
+    Cq::AbstractArray{T, 3}, 
+    Ckv::AbstractArray{T, 3},
+    W_KQ::AbstractArray{T, 4},
+    ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
+    ) where {T, M <: AbstractArray{Bool}}
+    Ckv = Flux.unsqueeze(Ckv, dims=3)
+    Cq = Flux.unsqueeze(Cq, dims=3)
+    keyT = permutedims(Ckv, (2, 1, 3, 4))    # (N, dc, 1, B)
+    U = broadcasted_batched_mul(W_KQ, Cq)    # (dc, N, nhead, B)
+    atten = scale .* broadcasted_batched_mul(keyT, U) # (N, N, nhead, B)
+    atten = apply_mask(atten, mask)       
+    scores = softmax(atten; dims=1)
+    broadcasted_batched_mul(Ckv, scores), scores # (dc, N, nhead, B)
+end
+
+function absorbed_attention_broadcasted(
+    Cq::AbstractArray{T, 3}, 
+    Ckv::AbstractArray{T, 3},
+    W_KQ::AbstractArray{T, 4},
+    Kr::AbstractArray{T, 3},
+    Qr::AbstractArray{T, 4},
+    ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
+    ) where {T, M <: AbstractArray{Bool}}
+    Ckv = Flux.unsqueeze(Ckv, dims=3)
+    Cq = Flux.unsqueeze(Cq, dims=3)
+    keyT = permutedims(Ckv, (2, 1, 3, 4))    # (N, dc, 1, B)
+    U = broadcasted_batched_mul(W_KQ, Cq)    # (dc, N, nhead, B) 
+    atten = scale .* broadcasted_batched_mul(keyT, U) # (N, N, nhead, B)
+    # embeddings
+    KrT = Flux.unsqueeze(permutedims(Kr, (2, 1, 3)), dims=3) # (N, dr, 1, B)
+    atten_embed = scale .* broadcasted_batched_mul(KrT, Qr)  # (N, N, nhead, B)
+    atten += atten_embed
+    # merge
+    atten = apply_mask(atten, mask)       
+    scores = softmax(atten; dims=1)
+    broadcasted_batched_mul(Ckv, scores), scores # (dc, N, nhead, B)
 end

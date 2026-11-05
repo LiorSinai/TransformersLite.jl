@@ -18,6 +18,7 @@ include("batched_mul.jl")
 include("tail.jl")
 export mul4d, broadcasted_mul4d, broadcasted_batched_mul
 export scaled_dot_attention, multi_head_scaled_dot_attention
+export absorbed_attention, absorbed_attention_broadcasted
 
 ## Layers
 include("embedding/tokenizer.jl")

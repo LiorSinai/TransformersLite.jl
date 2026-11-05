@@ -27,7 +27,7 @@ The forward pass calculates:
 
 Reference: https://arxiv.org/abs/2405.04434
 """
-struct MultiHeadLatentAttention{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} where T, R} 
+struct MultiHeadLatentAttention{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} where T, E} 
     nhead::Int
     denseDQ::D1
     denseUQ::D1
@@ -38,7 +38,7 @@ struct MultiHeadLatentAttention{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3} 
     # extras
     norm_cq::N
     norm_ckv::N
-    embedding::R
+    embedding::E
     cache_ckv::A
 end
 

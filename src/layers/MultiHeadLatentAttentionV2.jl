@@ -96,27 +96,51 @@ end
 function _absorb_WUK_WUQ(nhead::Int, W_UK::AbstractMatrix, W_UQ::AbstractMatrix)
     # W_KQ = (W_UK)^T * W_UQ
     dh = div(size(W_UK, 1), nhead)
-    dim_lora = size(W_UK, 2)
+    dc = size(W_UK, 2)
     # (dh*nhead, dc) => (dh, dc, nhead)
-    W_UQ = permutedims(reshape(W_UQ, dh, nhead, dim_lora), (1, 3, 2)) 
-    W_UK = permutedims(reshape(W_UK, dh, nhead, dim_lora), (1, 3, 2))
-    W_UKT = permutedims(W_UK, (2, 1, 3)) # (dh, dc, nhead)^T => (dc, dh, nhead)
-    batched_mul(W_UKT, W_UQ) 
+    W_UQ = permutedims(reshape(W_UQ, dh, nhead, dc), (1, 3, 2)) # (dh, dc, nhead)
+    W_UK = permutedims(reshape(W_UK, dh, nhead, dc), (1, 3, 2)) # (dh, dc, nhead)
+    W_UKT = permutedims(W_UK, (2, 1, 3))                        # (dc, dh, nhead)
+    W_KQ = batched_mul(W_UKT, W_UQ)                             # (dc, dc, nhead)
+    permutedims(W_KQ, (1, 3, 2))
 end
 
 function _absorb_WO_WUV(nhead::Int, W_O::AbstractMatrix, W_UV::AbstractMatrix)
     #  W_VO = W_O * W_UV
     dh = div(size(W_UV, 1), nhead)
-    dim_lora = size(W_UV, 2)
+    dc = size(W_UV, 2)
     dout = size(W_O, 1)
-    W_UVh = permutedims(reshape(W_UV, dh, nhead, dim_lora), (1, 3, 2)) # (dh*nhead, dc) => (dh, dc, nhead)
-    W_Oh = reshape(W_O, dout, dh, nhead) # (dout, dh*nhead) => (dout, dh, nhead)
-    W_OVh = batched_mul(W_Oh, W_UVh) # (dout, dh, nhead) * (dh, dc, nhead)
-    reshape(W_OVh, dout, dim_lora*nhead) # (dout, dc, nhead) => (dout, dc*nhead)
+    W_UVh = permutedims(reshape(W_UV, dh, nhead, dc), (1, 3, 2)) # (dh, dc, nhead)
+    W_Oh = reshape(W_O, dout, dh, nhead)                         # (dout, dh, nhead)
+    W_OVh = batched_mul(W_Oh, W_UVh)                             # (dout, dc, nhead)
+    reshape(W_OVh, dout, dc*nhead)                               # (dout, dc*nhead)
+end
+
+function _apply_embeddings(mla::MultiHeadLatentAttentionV2, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
+    dc, dq, batch_dim = size(cq)
+    kr = mla.denseKR(key)
+    qr = mla.denseQR(cq)
+    kr = mla.embedding(kr, idx) # size(kr) == (dr, dkv, B)
+    qr = permutedims(reshape(qr, :, mla.nhead, dq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
+    qr = mla.embedding(qr, idx)
+    kr, qr
+end
+
+function _cat_decoupled_embedding(nhead::Int, Qin::A3, Qr::A4, Kin::A3, kr::A3) where {T, A3 <: AbstractArray{T, 3}, A4 <: AbstractArray{T, 4}}
+    dhq, dq, B = size(Qin)
+    dhk, dkv, B = size(Kin)
+    Q = reshape(
+        cat(reshape(Qin, :, nhead, dq, B), permutedims(Qr, (1, 3, 2, 4)), dims=1),
+        : , dq, B)
+    Kr = repeat(Flux.unsqueeze(kr, dims=2), outer=(1, nhead, 1, 1))
+    K = reshape(
+        cat(reshape(Kin, :, nhead, dkv, B), reshape(Kr, :, nhead, dkv, B), dims=1),
+        :, dkv, B)
+    Q, K
 end
 
 function (mla::MultiHeadLatentAttentionV2)(query::A3, key::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
-    mla_naive(mla, query, key; kwargs...) # this is faster than the absorb
+    mla_naive(mla, query, key; kwargs...)
 end
 
 function mla_naive(
@@ -145,29 +169,6 @@ function mla_naive(
     mla.denseO(A), scores
 end
 
-function _apply_embeddings(mla::MultiHeadLatentAttentionV2, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
-    dim_lora, dq, batch_dim = size(cq)
-    kr = mla.denseKR(key)
-    qr = mla.denseQR(cq)
-    kr = mla.embedding(kr, idx) # size(kr) == (dr, dkv, B)
-    qr = permutedims(reshape(qr, :, mla.nhead, dq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
-    qr = mla.embedding(qr, idx)
-    kr, qr
-end
-
-function _cat_decoupled_embedding(nhead::Int, Qin::A3, Qr::A4, Kin::A3, kr::A3) where {T, A3 <: AbstractArray{T, 3}, A4 <: AbstractArray{T, 4}}
-    dhq, dq, B = size(Qin)
-    dhk, dkv, B = size(Kin)
-    Q = reshape(
-        cat(reshape(Qin, :, nhead, dq, B), permutedims(Qr, (1, 3, 2, 4)), dims=1),
-        : , dq, B)
-    Kr = repeat(Flux.unsqueeze(kr, dims=2), outer=(1, nhead, 1, 1))
-    K = reshape(
-        cat(reshape(Kin, :, nhead, dkv, B), reshape(Kr, :, nhead, dkv, B), dims=1),
-        :, dkv, B)
-    Q, K
-end
-
 function mla_absorb(
     mla::MultiHeadLatentAttentionV2, query::A3, key::A3
     ; start_pos::Int=1, use_cache::Bool=false, mask::Union{Nothing, M}=nothing
@@ -175,10 +176,9 @@ function mla_absorb(
     # batch multiplication version. Input is dm × N × nhead*B
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
-    dq = size(query, 2)
     dh = div(size(mla.denseUK.weight, 1), mla.nhead) # dim_head, which can differ from dim_in ÷ nhead
-    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
+    cq = mla.norm_cq(mla.denseDQ(query))             # size(cq) == (dc, dq, B)
+    ckv = mla.norm_ckv(mla.denseDKV(key))            # size(ckv) == (dc, dkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     dr = size(kr, 1)
     if use_cache
@@ -187,23 +187,16 @@ function mla_absorb(
         ckv = mla.cache_ckv[:, 1:end_pos, 1:batch_dim]
         kr = mla.cache_kr[:, 1:end_pos, 1:batch_dim]
     end
-    ## softmax(1/sqrt(dh) * K^T * Q)
-    ## = softmax(1/sqrt(dh) * ckv^T * W_UK^T * W_QU * cq)
-    ckv_ = Flux.unsqueeze(ckv, dims=3)
-    keyT = permutedims(ckv_, (2, 1, 3, 4)) # (dkv, dc, B) => (dkv, dc, 1, B)
-    cq_ = Flux.unsqueeze(cq, dims=3) # (dkv, dc, B) => (dkv, dc, 1, B)
-    W_KQ = Flux.unsqueeze(mla.W_KQ, dims=4); # (dc, dc, nhead) => (dc, dc, nhead, 1)
-    krT = Flux.unsqueeze(permutedims(kr, (2, 1, 3)), dims=3) # (dr, dkv, B) => (dkv, dr, 1, 1B)
-    atten_base = broadcasted_batched_mul(keyT, broadcasted_batched_mul(W_KQ, cq_))
-    atten_embed = broadcasted_batched_mul(krT, qr)
-    atten = one(T)/convert(T, sqrt(dh + dr)) .* (atten_base + atten_embed)
-    atten = apply_mask(atten, mask)
-    scores = softmax(atten; dims=1)
-    ## W_O * V * atten
-    ## = W_O * (W_V * ckv) * atten
-    A = broadcasted_batched_mul(ckv_, scores) # (dc, dq, nhead, B)
-    # (dc, dq, nhead, B) => (dc*nhead, dq, B)
-    A = permutedims(A, [1, 3, 2, 4])
-    A = reshape(A, :, size(A, 3), size(A, 4))
+    # softmax(1/sqrt(dc) * K^T * Q)
+    # = softmax(1/sqrt(dh) * ckv^T * W_UK^T * W_QU * cq)
+    # = softmax(1/sqrt(dh) * ckv^T * W_KQ * cq)
+    dc, N, B = size(cq)
+    scale = T(1 / sqrt(dh + dr))
+    qr = reshape(permutedims(qr, (1, 3, 2, 4)), dr, :, B)
+    A, scores = absorbed_attention(cq, ckv, mla.W_KQ, kr, qr; mask=mask, scale=scale) # (dc, nhead, N, B); (N, N, nhead, B)
+    A = reshape(A, :, N, B)
+    # W_O * V * A
+    # = W_O * (W_V * ckv) * A
+    # = W_OV * A
     mla.denseOV(A), scores # (dout, dq, B)
 end
