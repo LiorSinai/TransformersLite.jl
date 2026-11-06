@@ -3,6 +3,8 @@ using TransformersLite: make_causal_mask
 using Flux: Dense, pullback
 using Test
 
+@testset "MultiHeadAttention" verbose=true  begin
+
 @testset "MultiHeadAttention" begin
     nhead, dim_model, dim_out = 4, 32, 13
     mask = make_causal_mask(ones(10, 10))
@@ -102,4 +104,6 @@ end
     # Require rope `dim == dim_head`
     rope = RoPE(10, 1000)
     @test_throws ArgumentError TransformersLite.MultiHeadAttention(nhead, dim_model, dim_out; embedding=rope)
+end
+
 end

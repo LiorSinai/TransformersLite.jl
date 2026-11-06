@@ -3,6 +3,8 @@ using TransformersLite: make_causal_mask, mla_naive, mla_absorb
 using Flux: pullback
 using Test
 
+@testset "MultiHeadLatentAttention" verbose=true begin
+
 @testset "MultiHeadLatentAttention" begin
     nhead, dim_head, dim_lora, dim_out = 2, 4, 7, 9
     dim_model = nhead * dim_head
@@ -154,4 +156,6 @@ end
     grads = back(1.0f0)[1]
     @test size(grads.denseOV.weight) == size(mla3.denseOV.weight)
     @test size(grads.denseKQ.weight) == size(mla3.denseKQ.weight)
+end
+
 end

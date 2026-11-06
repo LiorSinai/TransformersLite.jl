@@ -10,6 +10,7 @@ using TransformersLite
     include("batched_mul.jl")
     include("attention.jl")
     include("layers/MultiHeadAttention.jl")
+    include("layers/MultiHeadLatentAttention.jl")
     include("layers/block.jl")
     include("models/classifier.jl")
     include("models/generator.jl")
