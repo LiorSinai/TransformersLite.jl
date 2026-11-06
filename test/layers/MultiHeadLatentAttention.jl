@@ -57,21 +57,22 @@ end
     @test isapprox(AX[:, end, :], Ax[:, end, :])
 end
 
-@testset "MultiHeadLatentAttentionV2" begin
+@testset "MultiHeadLatentAttentionV2 and V3" begin
     nhead, dim_head, dim_rope, dc, dim_out = 2, 4, 4, 7, 9
     dim_model = nhead * dim_head
     N, max_seq_length, batch_dim = 10, 16, 3
-    mla = MultiHeadLatentAttentionV2(
+    mla2 = MultiHeadLatentAttentionV2(
         nhead=nhead, dim_in=dim_model, dim_head=dim_head, dim_rope=dim_rope,
         dim_lora=dc, dim_out=dim_out,
         max_seq_length=max_seq_length, max_batch_size=batch_dim
         )
+    mla3 = absorb_weights(mla2)
     
     X0 = randn(Float32, dim_model, N, batch_dim)
     # Fill cache and compare with naive
     mask = make_causal_mask(ones(N, N));
-    A_naive, scores_naive = mla_naive(mla, X0, X0; mask=mask, use_cache=true);
-    A_absorb, scores_absorb = mla_absorb(mla, X0, X0; mask=mask, use_cache=true);
+    A_naive, scores_naive = mla_naive(mla2, X0, X0; mask=mask, use_cache=true);
+    A_absorb, scores_absorb = mla_absorb(mla3, X0, X0; mask=mask, use_cache=true);
     @test isapprox(A_absorb, A_naive)
     @test maximum(abs.(A_absorb - A_naive)) < 1e-5
     @test isapprox(scores_absorb, scores_naive)
@@ -80,10 +81,10 @@ end
     x = randn(Float32, dim_model, 1, batch_dim)
     X = cat(X0, x, dims=2)
     mask = repeat([true], inner=(N + 1, 1))
-    Ax_naive, scoresx_naive = mla_naive(mla, x, x; mask=mask, start_pos=11, use_cache=true)
-    Ax_absorb, scoresx_absorb = mla_absorb(mla, x, x; mask=mask, start_pos=11, use_cache=true)
+    Ax_naive, scoresx_naive = mla_naive(mla2, x, x; mask=mask, start_pos=11, use_cache=true)
+    Ax_absorb, scoresx_absorb = mla_absorb(mla3, x, x; mask=mask, start_pos=11, use_cache=true)
     mask = make_causal_mask(ones(N + 1, N + 1))
-    AX, scoresX = mla_naive(mla, X, X; mask=mask, use_cache=false)
+    AX, scoresX = mla_naive(mla2, X, X; mask=mask, use_cache=false)
     @test size(AX) == (9, 11, 3)
     @test size(Ax_naive) == (9, 1, 3)
     @test size(Ax_absorb) == (9, 1, 3)
@@ -94,16 +95,17 @@ end
 @testset "MultiHeadLatentAttentionV2 odd sizes" begin
     nhead, dim_in, dim_head, dim_rope, dim_lora, dim_out = 3, 10, 4, 6, 7, 9
     N, max_seq_length, batch_dim = 10, 16, 3
-    mla = MultiHeadLatentAttentionV2(
+    mla2 = MultiHeadLatentAttentionV2(
         nhead=nhead, dim_in=dim_in, dim_head=dim_head, dim_rope=dim_rope,
         dim_lora=dim_lora, dim_out=dim_out,
         max_seq_length=max_seq_length, max_batch_size=batch_dim
         )
+    mla3 = absorb_weights(mla2)
 
     X0 = randn(Float32, dim_in, N, batch_dim)
     mask = make_causal_mask(ones(N, N))
-    A_naive, scores_naive = mla_naive(mla, X0, X0; mask=mask, use_cache=true)
-    A_absorb, scores_absorb = mla_absorb(mla, X0, X0; mask=mask, use_cache=true)
+    A_naive, scores_naive = mla_naive(mla2, X0, X0; mask=mask, use_cache=true)
+    A_absorb, scores_absorb = mla_absorb(mla3, X0, X0; mask=mask, use_cache=true)
     @test size(A_naive) == (dim_out, N, batch_dim)
     @test size(scores_naive) == (N, N, nhead, batch_dim)
     @test isapprox(A_absorb, A_naive)
@@ -112,10 +114,10 @@ end
     x = randn(Float32, dim_in, 1, batch_dim)
     X = cat(X0, x, dims=2)
     mask = repeat([true], inner=(N + 1, 1))
-    Ax_naive, _ = mla_naive(mla, x, x; mask=mask, start_pos=N + 1, use_cache=true)
-    Ax_absorb, _ = mla_absorb(mla, x, x; mask=mask, start_pos=N + 1, use_cache=true)
+    Ax_naive, _ = mla_naive(mla2, x, x; mask=mask, start_pos=N + 1, use_cache=true)
+    Ax_absorb, _ = mla_absorb(mla3, x, x; mask=mask, start_pos=N + 1, use_cache=true)
     mask = make_causal_mask(ones(N + 1, N + 1))
-    AX, _ = mla_naive(mla, X, X; mask=mask, use_cache=false)
+    AX, _ = mla_naive(mla2, X, X; mask=mask, use_cache=false)
     @test isapprox(Ax_absorb, Ax_naive)
     @test isapprox(AX[:, end, :], Ax_naive[:, end, :])
 end
@@ -146,4 +148,10 @@ end
     grads = back(1.0f0)[1]
     @test size(grads.denseUQ.weight) == size(mla2.denseUQ.weight)
     @test size(grads.denseKR.weight) == size(mla2.denseKR.weight)
+
+    mla3 = absorb_weights(mla2)
+    _, back = pullback(m -> sum(first(m(X, X; mask=mask))), mla3)
+    grads = back(1.0f0)[1]
+    @test size(grads.denseOV.weight) == size(mla3.denseOV.weight)
+    @test size(grads.denseKQ.weight) == size(mla3.denseKQ.weight)
 end

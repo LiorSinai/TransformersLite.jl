@@ -1,5 +1,3 @@
-using Flux
-
 """
     MultiHeadLatentAttentionV2(;
     nhead, dim_in, dim_head, dim_lora, dim_out, dim_rope,
@@ -7,22 +5,36 @@ using Flux
     norm_layer=RMSNorm, embedding_layer=RoPE
     )
 
-DeepSeek's Multi-Head Latent Attention with decoupled RoPE and weight absorption.
+DeepSeek's Multi-Head Latent Attention with decoupled RoPE.
+The position embedding is applied to separate query and key vectors of size `dim_rope`.
+The key embedding `kr` is shared across all heads.
+Both the key-value latent `ckv` and `kr` are cached,
+so the cache size is `(dim_lora + dim_rope) × max_seq_length × max_batch_size`.
 
-The forward pass calculates:
+See also `MultiHeadLatentAttentionV3`, which is the same layer with weight absorption.
+This can be layer converted to `MultiHeadLatentAttentionV3` using `absorb_weights`:
+```julia
+mla_v3 = absorb_weights(mla_v2)
+```
+
+The forward pass calculates per head:
 ```math
-  Q = W^UQ * norm_cq(W^DQ * query)
-    ckv = norm_ckv(W^DK * key)
+  cq = norm_cq(W^DQ * query)
+    ckv = norm_ckv(W^DKV * key)
+    Q = W^UQ * cq
     K = W^UK * ckv
     V = W^UV * ckv
+    qr = embedding(W^QR * cq, idx)
     kr = embedding(W^KR * key, idx)
-    qr = embedding(W^QR * query, idx)
-    Q = cat(Q, qr)
-    K = cat(K, kr)
-    scores = 1/sqrt(dh+dr) * (K^T * Q) .* mask
+    Q = vcat(Q, qr)
+    K = vcat(K, kr)
+    scores = softmax(1/sqrt(dh + dr) * K^T * Q; dims=1)
     A = V * scores
     W^O * A, scores
 ```
+along with masking before the softmax if the `mask` is not `nothing`.
+Here `idx = start_pos:(start_pos + N - 1)` are the positions of the query.
+If `use_cache=true`, `ckv` and `kr` are the cached values for positions `1:(start_pos + N - 1)`.
 
 Reference: https://arxiv.org/abs/2405.04434
 """
@@ -41,9 +53,6 @@ struct MultiHeadLatentAttentionV2{D1<:Dense, D2<:Dense, N, A<:AbstractArray{T, 3
     embedding::R
     denseQR::D1
     denseKR::D1
-    # absorb
-    W_KQ::A
-    denseOV::D1
     # cache
     cache_ckv::A
     cache_kr::A
@@ -68,11 +77,6 @@ function MultiHeadLatentAttentionV2(;
     embedding = embedding_layer(dim_rope, max_seq_length)
     denseQR = Dense(dim_lora => dim_rope * nhead; bias=false)
     denseKR = Dense(dim_in => dim_rope; bias=false)
-    # W_KQ = (W_UK)^T * W_UQ
-    W_KQ = _absorb_WUK_WUQ(nhead, denseUK.weight, denseUQ.weight)
-    # W_OV = W_O * W_UV
-    W_OV = _absorb_WO_WUV(nhead, denseO.weight, denseUV.weight)
-    denseOV = Dense(W_OV, false, denseO.σ)
     # cache
     T = eltype(denseDKV.weight)
     cache_ckv = similar(denseDKV.weight, T, dim_lora, max_seq_length, max_batch_size)
@@ -86,34 +90,9 @@ function MultiHeadLatentAttentionV2(;
         norm_cq, norm_ckv,
         # embedding
         embedding, denseQR, denseKR,
-        # absorb
-        W_KQ, denseOV,
         # cache
         cache_ckv, cache_kr
     )
-end
-
-function _absorb_WUK_WUQ(nhead::Int, W_UK::AbstractMatrix, W_UQ::AbstractMatrix)
-    # W_KQ = (W_UK)^T * W_UQ
-    dh = div(size(W_UK, 1), nhead)
-    dc = size(W_UK, 2)
-    # (dh*nhead, dc) => (dh, dc, nhead)
-    W_UQ = permutedims(reshape(W_UQ, dh, nhead, dc), (1, 3, 2)) # (dh, dc, nhead)
-    W_UK = permutedims(reshape(W_UK, dh, nhead, dc), (1, 3, 2)) # (dh, dc, nhead)
-    W_UKT = permutedims(W_UK, (2, 1, 3))                        # (dc, dh, nhead)
-    W_KQ = batched_mul(W_UKT, W_UQ)                             # (dc, dc, nhead)
-    permutedims(W_KQ, (1, 3, 2))
-end
-
-function _absorb_WO_WUV(nhead::Int, W_O::AbstractMatrix, W_UV::AbstractMatrix)
-    #  W_VO = W_O * W_UV
-    dh = div(size(W_UV, 1), nhead)
-    dc = size(W_UV, 2)
-    dout = size(W_O, 1)
-    W_UVh = permutedims(reshape(W_UV, dh, nhead, dc), (1, 3, 2)) # (dh, dc, nhead)
-    W_Oh = reshape(W_O, dout, dh, nhead)                         # (dout, dh, nhead)
-    W_OVh = batched_mul(W_Oh, W_UVh)                             # (dout, dc, nhead)
-    reshape(W_OVh, dout, dc*nhead)                               # (dout, dc*nhead)
 end
 
 function _apply_embeddings(mla::MultiHeadLatentAttentionV2, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
@@ -126,17 +105,14 @@ function _apply_embeddings(mla::MultiHeadLatentAttentionV2, key::A3, cq::A3, idx
     kr, qr
 end
 
-function _cat_decoupled_embedding(nhead::Int, Qin::A3, Qr::A4, Kin::A3, kr::A3) where {T, A3 <: AbstractArray{T, 3}, A4 <: AbstractArray{T, 4}}
-    dhq, dq, B = size(Qin)
-    dhk, dkv, B = size(Kin)
-    Q = reshape(
-        cat(reshape(Qin, :, nhead, dq, B), permutedims(Qr, (1, 3, 2, 4)), dims=1),
-        : , dq, B)
-    Kr = repeat(Flux.unsqueeze(kr, dims=2), outer=(1, nhead, 1, 1))
-    K = reshape(
-        cat(reshape(Kin, :, nhead, dkv, B), reshape(Kr, :, nhead, dkv, B), dims=1),
-        :, dkv, B)
-    Q, K
+function _cat_decoupled_embedding(nhead::Int, Q::A3, qr::A4, K::A3, kr::A3) where {T, A3 <: AbstractArray{T, 3}, A4 <: AbstractArray{T, 4}}
+    dq, dq, B = size(Q)
+    dr, dkv, _ = size(kr)
+    qr = permutedims(qr, (1, 3, 2, 4))                      # (dr, dq, nhead, B) => (dr, nhead, dq, B)
+    kr = repeat(reshape(kr, dr, 1, dkv, B), 1, nhead, 1, 1) # (dr, dkv, B) => (dr, nhead, dkv, B)
+    Q = cat(reshape(Q, :, nhead, dq, B), qr; dims=1)        # (dh+dr, nhead, dq, B)
+    K = cat(reshape(K, :, nhead, dkv, B), kr; dims=1)       # (dh+dr, nhead, dkv, B)
+    reshape(Q, :, dq, B), reshape(K, :, dkv, B)             # (nhead*(dh+dr), N, B)
 end
 
 function (mla::MultiHeadLatentAttentionV2)(query::A3, key::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
@@ -147,9 +123,10 @@ function mla_naive(
     mla::MultiHeadLatentAttentionV2, query::A3, key::A3
     ; start_pos::Int=1, use_cache::Bool=false, mask::Union{Nothing, M}=nothing
     ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
+    # batch multiplication version. Input is dm × N × nhead*B
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
-    cq = mla.norm_cq(mla.denseDQ(query))   # size(cq) == (dc, dq, B)
+    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
     ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     if use_cache
@@ -167,36 +144,4 @@ function mla_naive(
         ; mask=mask, embedding=identity # already applied embeddings
     )
     mla.denseO(A), scores
-end
-
-function mla_absorb(
-    mla::MultiHeadLatentAttentionV2, query::A3, key::A3
-    ; start_pos::Int=1, use_cache::Bool=false, mask::Union{Nothing, M}=nothing
-    ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
-    # batch multiplication version. Input is dm × N × nhead*B
-    dm, seq_length, batch_dim = size(key)
-    end_pos = start_pos + seq_length - 1
-    dh = div(size(mla.denseUK.weight, 1), mla.nhead) # dim_head, which can differ from dim_in ÷ nhead
-    cq = mla.norm_cq(mla.denseDQ(query))             # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(key))            # size(ckv) == (dc, dkv, B)
-    kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
-    dr = size(kr, 1)
-    if use_cache
-        mla.cache_ckv[:, start_pos:end_pos, 1:batch_dim] = ckv
-        mla.cache_kr[:, start_pos:end_pos, 1:batch_dim] = kr
-        ckv = mla.cache_ckv[:, 1:end_pos, 1:batch_dim]
-        kr = mla.cache_kr[:, 1:end_pos, 1:batch_dim]
-    end
-    # softmax(1/sqrt(dc) * K^T * Q)
-    # = softmax(1/sqrt(dh) * ckv^T * W_UK^T * W_QU * cq)
-    # = softmax(1/sqrt(dh) * ckv^T * W_KQ * cq)
-    dc, N, B = size(cq)
-    scale = T(1 / sqrt(dh + dr))
-    qr = reshape(permutedims(qr, (1, 3, 2, 4)), dr, :, B)
-    A, scores = absorbed_attention(cq, ckv, mla.W_KQ, kr, qr; mask=mask, scale=scale) # (dc, nhead, N, B); (N, N, nhead, B)
-    A = reshape(A, :, N, B)
-    # W_O * V * A
-    # = W_O * (W_V * ckv) * A
-    # = W_OV * A
-    mla.denseOV(A), scores # (dout, dq, B)
 end

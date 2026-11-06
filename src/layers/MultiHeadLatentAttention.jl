@@ -8,22 +8,27 @@ using Flux
     )
 
 DeepSeek's Multi-Head Latent Attention with RoPE.
-This layer compresses the `key` and `query` before uncompressing them.
-This results in a smaller cache size `dim_lora × max_seq_length × max_batch_size`
-as well as a significant performance boost.
+This layer compresses the `key` and `query` into a latent space of size `dim_lora` before uncompressing them.
+Only the compressed key-value latent is cached, so the cache size is `dim_lora × max_seq_length × max_batch_size`
+instead of `2 × dim_head × nhead × max_seq_length × max_batch_size` for standard multi-head attention.
 
-See also `MultiHeadLatentAttentionV2` with decoupled embeddings and weight absorption.
+See also `MultiHeadLatentAttentionV2` with decoupled embeddings
+and `MultiHeadLatentAttentionV3` with decoupled embeddings and weight absorption.
 
-The forward pass calculates:
+The forward pass calculates per head:
 ```math
-  Q = embedding(W^UQ * norm_cq(W^DQ * query))
-    ckv = norm_ckv(W^DK * key)
+  cq = norm_cq(W^DQ * query)
+    ckv = norm_ckv(W^DKV * key)
+    Q = embedding(W^UQ * cq, idx)
     K = embedding(W^UK * ckv)
     V = W^UV * ckv
-    scores = 1/sqrt(dh) * (K^T * Q) .* mask
+    scores = softmax(1/sqrt(dh) * K' * Q; dims=1)
     A = V * scores
     W^O * A, scores
 ```
+along with masking before the softmax if the `mask` is not `nothing`.
+Here `idx = start_pos:(start_pos + N - 1)` are the positions of the query.
+If `use_cache=true`, `ckv` is the cached latent for positions `1:(start_pos + N - 1)`.
 
 Reference: https://arxiv.org/abs/2405.04434
 """

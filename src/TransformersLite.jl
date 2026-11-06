@@ -2,6 +2,7 @@ module TransformersLite
 
 using ChainRulesCore: @thunk, @non_differentiable
 using Flux
+using Flux: @layer, unsqueeze
 using LinearAlgebra
 using NNlib: gather, softmax, batched_mul, batched_mul!, batched_transpose
 using Random
@@ -33,8 +34,10 @@ export RMSNorm, rms_norm
 include("layers/MultiHeadAttention.jl")
 include("layers/MultiHeadLatentAttention.jl")
 include("layers/MultiHeadLatentAttentionV2.jl")
+include("layers/MultiHeadLatentAttentionV3.jl")
 export MultiHeadAttention, MultiHeadAttentionKVCache
-export MultiHeadLatentAttention, MultiHeadLatentAttentionV2
+export MultiHeadLatentAttention, MultiHeadLatentAttentionV2, MultiHeadLatentAttentionV3
+export absorb_weights
 
 include("layers/aggregate_layer.jl")
 export MeanLayer, FlattenLayer

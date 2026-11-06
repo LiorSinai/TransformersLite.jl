@@ -1,6 +1,7 @@
-using TransformersLite: multi_head_scaled_dot_attention, scaled_dot_attention, make_causal_mask
+using Flux: Dense, gradient, pullback, unsqueeze
 using LinearAlgebra
-using Flux: pullback, gradient, unsqueeze
+using Test
+using TransformersLite: multi_head_scaled_dot_attention, scaled_dot_attention, make_causal_mask
 
 @testset "attention" verbose=true begin
 
@@ -136,7 +137,8 @@ end
     Cq = randn(dc, n, B)
     Ckv = randn(dc, n, B)
     W_KQ = randn(dc, nhead, dc)
-    A1, scores1 = absorbed_attention(Cq, Ckv, W_KQ)
+    denseKQ = Dense(reshape(W_KQ, dc*nhead, dc), false)
+    A1, scores1 = absorbed_attention(Cq, Ckv, denseKQ)
     @test size(A1) == (dc, nhead, n, B) && size(scores1) == (n, n, nhead, B)
     W2 = unsqueeze(permutedims(W_KQ, (1, 3, 2)), dims=4)
     A2, scores2 = absorbed_attention_broadcasted(Cq, Ckv, W2)
@@ -155,9 +157,10 @@ end
     Cq = randn(dc, n, B)
     Ckv = randn(dc, n, B)
     W_KQ = randn(dc, nhead, dc)
+    denseKQ = Dense(reshape(W_KQ, dc*nhead, dc), false)
     Kr = randn(dr, n, B)
     Qr = randn(dr, nhead * n, B)
-    A1, scores1 = absorbed_attention(Cq, Ckv, W_KQ, Kr, Qr)
+    A1, scores1 = absorbed_attention(Cq, Ckv, denseKQ, Kr, Qr)
     @test size(A1) == (dc, nhead, n, B) && size(scores1) == (n, n, nhead, B)
     W2 = unsqueeze(permutedims(W_KQ, (1, 3, 2)), dims=4)
     Qr2 = permutedims(reshape(Qr, dr, nhead, n, B), (1, 3, 2, 4))
