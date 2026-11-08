@@ -90,8 +90,9 @@ end
 
 N-D matrix multiplication. Broadcast over batch dims (dims ≥ 3) if they are 1.
 
-GPU friendly (no scalar indexing) and never copies the inputs, but not differentiable.
+GPU friendly (no scalar indexing) and never copies the inputs in the forward pass.
 See `broadcasted_batched_mul!`.
+Differentiable through a custom `rrule` because `broadcasted_batched_mul!` mutates its output.
 
 This only beats `broadcasted_batched_mul` when there are mixed batch dimensions e.g. (n, d, 1, B) x (d, n, H, 1)
 
@@ -101,6 +102,30 @@ function broadcasted_batched_mul_fast(A::AbstractArray{T, N}, B::AbstractArray{T
     batch_C, _, _ = _broadcast_batch_sizes(size(A)[3:N], size(B)[3:N])
     C = similar(A, T, size(A, 1), size(B, 2), batch_C...)
     broadcasted_batched_mul!(C, A, B)
+end
+
+function rrule(::typeof(broadcasted_batched_mul_fast), A::AbstractArray{T, N}, B::AbstractArray{T, N}) where {T, N}
+    C = broadcasted_batched_mul_fast(A, B)
+    function broadcasted_batched_mul_fast_pullback(C̄)
+        C̄ = unthunk(C̄)
+        perm = (2, 1, ntuple(i -> i + 2, N - 2)...)
+        # per matrix: Ā = C̄ * Bᵀ and B̄ = Aᵀ * C̄
+        # a batch dim that was broadcast in the forward pass is summed over in the backward pass
+        Ā = @thunk _sum_broadcast_dims(broadcasted_batched_mul_fast(C̄, permutedims(B, perm)), size(A))
+        B̄ = @thunk _sum_broadcast_dims(broadcasted_batched_mul_fast(permutedims(A, perm), C̄), size(B))
+        return NoTangent(), Ā, B̄
+    end
+    return C, broadcasted_batched_mul_fast_pullback
+end
+
+"""
+    _sum_broadcast_dims(X, sz)
+
+Sum `X` over the batch dims (dims ≥ 3) where `sz` is 1 but `X` is not, so that the result has size `sz`.
+"""
+function _sum_broadcast_dims(X::AbstractArray, sz::Tuple)
+    dims = Tuple(d for d in 3:ndims(X) if sz[d] == 1 && size(X, d) != 1)
+    isempty(dims) ? X : sum(X; dims=dims)
 end
 
 """

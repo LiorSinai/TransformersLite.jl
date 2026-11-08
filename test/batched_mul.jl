@@ -42,6 +42,23 @@ shapes = [
         dA1, dB1 = gradient(loss(broadcasted_batched_mul), A, B)
         @test size(dA1) == size(A)
         @test size(dB1) == size(B)
-        @test_throws ErrorException gradient(loss(broadcasted_batched_mul_fast), A, B)
+        dA2, dB2 = gradient(loss(broadcasted_batched_mul_fast), A, B)
+        @test dA1 ≈ dA2
+        @test dB1 ≈ dB2
+    end
+
+    @testset "gradient fast $sA x $sB" for (sA, sB) in [
+        ((7, 5, 3, 4), (5, 6, 1, 4)),
+        ((7, 5, 3, 1, 2), (5, 6, 1, 4, 2)),
+        ((7, 5, 1, 1, 2), (5, 6, 3, 4, 1)),
+        ((7, 5, 3), (5, 6, 1)),
+    ]
+        A = randn(sA...)
+        B = randn(sB...)
+        loss(f) = (a, b) -> sum(abs2, f(a, b))
+        dA1, dB1 = gradient(loss(broadcasted_batched_mul), A, B)
+        dA2, dB2 = gradient(loss(broadcasted_batched_mul_fast), A, B)
+        @test dA1 ≈ dA2
+        @test dB1 ≈ dB2
     end
 end

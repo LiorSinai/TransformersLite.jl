@@ -1,6 +1,6 @@
 module TransformersLite
 
-using ChainRulesCore: @thunk, @non_differentiable
+using ChainRulesCore: @thunk, @non_differentiable, unthunk
 using Flux
 using Flux: @layer, unsqueeze
 using LinearAlgebra
