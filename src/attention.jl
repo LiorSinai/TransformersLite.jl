@@ -143,21 +143,22 @@ function absorbed_attention(
     denseKQ::Dense,
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
-    # Input is (dc, N, nhead)
-    dc, N, B = size(Cq)
+    # Input is (dc, dq, B) and (dc, dkv, B)
+    dc, dq, B = size(Cq)
+    dkv = size(Ckv, 2)
     nhead = div(size(denseKQ.weight, 1), dc)
-    U = denseKQ(Cq)                                             # (dc*nhead, N, B)
-    CkvT = batched_transpose(Ckv)                               # (N, dc, nhead)
-    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * N, B))  # (N, nhead*N, B)
+    U = denseKQ(Cq)                # (dc*nhead, dq, B)
+    CkvT = batched_transpose(Ckv)  # (dkv, dc, B)
+    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * dq, B))  # (dkv, nhead*dq, B)
     if !isnothing(mask)
-        atten = reshape(atten, N, nhead, N, B)
+        atten = reshape(atten, dkv, nhead, dq, B)
         atten = apply_mask(atten, _heads_first_mask(mask))
-        atten = reshape(atten, N, :, B)
+        atten = reshape(atten, dkv, :, B)
     end
     scores = softmax(atten; dims=1)
     scores_out = permutedims(
-        reshape(scores, N, nhead, N, B), (1, 3, 2, 4))          # (N, N, nhead, B)
-    A = reshape(batched_mul(Ckv, scores), dc, nhead, N, B)      # (dc, nhead, N, B)
+        reshape(scores, dkv, nhead, dq, B), (1, 3, 2, 4))    # (dkv, dq, nhead, B)
+    A = reshape(batched_mul(Ckv, scores), dc, nhead, dq, B)  # (dc, nhead, dq, B)
     A, scores_out
 end
 
