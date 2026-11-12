@@ -2,6 +2,8 @@ using Flux: Dense, gradient, pullback, unsqueeze
 using LinearAlgebra
 using Test
 using TransformersLite: multi_head_scaled_dot_attention, scaled_dot_attention, make_causal_mask
+using TransformersLite: absorbed_attention, absorbed_attention_broadcasted
+using TransformersLite: _absorb_WUK_WUQ
 
 @testset "attention" verbose=true begin
 
@@ -168,6 +170,28 @@ end
     @test size(A2) == (dc, n, nhead, B) && size(scores2) == (n, n, nhead, B)
     A11 = permutedims(A1, (1, 3, 2, 4))
     @test A11 ≈ A2 && scores1 ≈ scores2
+end
+
+@testset "absorbed_attention factors" begin
+    n, dc, dh, dr, nhead, B = 6, 5, 2, 7, 3, 4
+    Cq = randn(Float32, dc, n, B)
+    Ckv = randn(Float32, dc, n, B)
+    denseUQ = Dense(dc => dh * nhead, bias=false)
+    denseUK = Dense(dc => dh * nhead, bias=false)
+    W_KQ = _absorb_WUK_WUQ(nhead, denseUK.weight, denseUQ.weight)
+    denseKQ = Dense(W_KQ, false)
+    mask = make_causal_mask(ones(n, n))
+    # without embeddings
+    A1, scores1 = absorbed_attention(Cq, Ckv, denseKQ; mask=mask)
+    A2, scores2 = absorbed_attention(nhead, Cq, Ckv, denseUQ, denseUK; mask=mask)
+    @test size(A2) == (dc, nhead, n, B) && size(scores2) == (n, n, nhead, B)
+    @test A1 ≈ A2 && scores1 ≈ scores2
+    # with embeddings
+    Kr = randn(Float32, dr, n, B)
+    Qr = randn(Float32, dr, nhead * n, B)
+    A1, scores1 = absorbed_attention(Cq, Ckv, denseKQ, Kr, Qr; mask=mask)
+    A2, scores2 = absorbed_attention(nhead, Cq, Ckv, denseUQ, denseUK, Kr, Qr; mask=mask)
+    @test A1 ≈ A2 && scores1 ≈ scores2
 end
 
 end
