@@ -75,11 +75,11 @@ function scaled_dot_attention(
     # Input is (dh, N, nhead)
     dh = size(query, 1)
     scale = T(1 / sqrt(dh))
-    keyT = batched_transpose(key)             # (dkv, dhkq, nhead)
-    atten = scale .* batched_mul(keyT, query) # (dkv, dq, nhead)
-    atten = apply_mask(atten, mask)           # (dkv, dq, nhead)
-    scores = softmax(atten; dims=1)           # (dkv, dq, nhead)
-    batched_mul(value, scores), scores        # (dhv, dq, nhead)
+    keyT = batched_transpose(key)             # (nkv, dhkq, nhead)
+    atten = scale .* batched_mul(keyT, query) # (nkv, nq, nhead)
+    atten = apply_mask(atten, mask)           # (nkv, nq, nhead)
+    scores = softmax(atten; dims=1)           # (nkv, nq, nhead)
+    batched_mul(value, scores), scores        # (dhv, nq, nhead)
 end
 
 function scaled_dot_attention(query::A4, key::A4, value::A4; kwargs...) where {T, A4 <: AbstractArray{T, 4}}
@@ -98,10 +98,10 @@ function scaled_dot_attention(
     ## Matrix version for a single head. Input is (dh, N)
     dh = size(query, 1)
     scale = T(1 / sqrt(dh))
-    atten = scale .* transpose(key) * query # (dkv, dh)*(dh, dq) => (dkv, dq)
-    atten = apply_mask(atten, mask)         # (dkv, dq)
-    scores = softmax(atten; dims=1)         # (dkv, dq)
-    value * scores, scores                  # (dh, dkv)*(dkv, dq) => (dh, dq)
+    atten = scale .* transpose(key) * query # (nkv, dh)*(dh, nq) => (nkv, nq)
+    atten = apply_mask(atten, mask)         # (nkv, nq)
+    scores = softmax(atten; dims=1)         # (nkv, nq)
+    value * scores, scores                  # (dh, nkv)*(nkv, nq) => (dh, nq)
 end
 
 """
@@ -121,19 +121,19 @@ This replaces the `nhead*B` small matrix multiplications of `absorbed_attention_
 with one large multiplication and `B` medium ones.
 
 Inputs:
-- `Cq`: latent query `(dc, dq, B)`.
-- `Ckv`: latent key-value `(dc, dkv, B)`.
+- `Cq`: latent query `(dc, nq, B)`.
+- `Ckv`: latent key-value `(dc, nkv, B)`.
 - `denseKQ`: `Dense(dc => dc*nhead)`.
-- `Kr`: key embedding `(dr, dkv, B)`, shared across heads.
-- `Qr`: query embedding `(dr, nhead*dq, B)`, heads first.
+- `Kr`: key embedding `(dr, nkv, B)`, shared across heads.
+- `Qr`: query embedding `(dr, nhead*nq, B)`, heads first.
 
-Returns `A` with size `(dc, nhead, dq, B)` and `scores` with size `(dkv, dq, nhead, B)`.
+Returns `A` with size `(dc, nhead, nq, B)` and `scores` with size `(nkv, nq, nhead, B)`.
 The calculation is:
 
-    U = denseKQ(Cq)                                       # (dc*nhead, dq, B)
-    U = reshape(U, dc, nhead*dq, B)                       # (dc, nhead*dq, B)
-    S = softmax(scale * (Ckv^T * U + Kr^T * Qr); dims=1)  # (dkv, nhead*dq, B)
-    A = Ckv * S                                           # (dc, nhead*dq, B)
+    U = denseKQ(Cq)                                       # (dc*nhead, nq, B)
+    U = reshape(U, dc, nhead*nq, B)                       # (dc, nhead*nq, B)
+    S = softmax(scale * (Ckv^T * U + Kr^T * Qr); dims=1)  # (nkv, nhead*nq, B)
+    A = Ckv * S                                           # (dc, nhead*nq, B)
 
 where `*` is batched over `B` and the `mask` is applied before the softmax if it is not `nothing`.
 """
@@ -143,31 +143,31 @@ function absorbed_attention(
     denseKQ::Dense,
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
-    # Input is (dc, dq, B) and (dc, dkv, B)
-    dc, dq, B = size(Cq)
+    # Input is (dc, nq, B) and (dc, nkv, B)
+    dc, nq, B = size(Cq)
     nhead = div(size(denseKQ.weight, 1), dc)
-    U = denseKQ(Cq) # (dc*nhead, dq, B)
-    _absorbed_attention(nhead, dq, Ckv, U; mask=mask, scale=scale)
+    U = denseKQ(Cq) # (dc*nhead, nq, B)
+    _absorbed_attention(nhead, nq, Ckv, U; mask=mask, scale=scale)
 end
 
 function _absorbed_attention(
-    nhead::Int, dq::Int,
+    nhead::Int, nq::Int,
     Ckv::AbstractArray{T, 3},
     U::AbstractArray{T, 3}
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
-    dc, dkv, B = size(Ckv)
-    CkvT = batched_transpose(Ckv)  # (dkv, dc, B)
-    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * dq, B))  # (dkv, nhead*dq, B)
+    dc, nkv, B = size(Ckv)
+    CkvT = batched_transpose(Ckv)  # (nkv, dc, B)
+    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * nq, B))  # (nkv, nhead*nq, B)
     if !isnothing(mask)
-        atten = reshape(atten, dkv, nhead, dq, B)
+        atten = reshape(atten, nkv, nhead, nq, B)
         atten = apply_mask(atten, _heads_first_mask(mask))
-        atten = reshape(atten, dkv, :, B)
+        atten = reshape(atten, nkv, :, B)
     end
     scores = softmax(atten; dims=1)
     scores_out = permutedims(
-        reshape(scores, dkv, nhead, dq, B), (1, 3, 2, 4))    # (dkv, dq, nhead, B)
-    A = reshape(batched_mul(Ckv, scores), dc, nhead, dq, B)  # (dc, nhead, dq, B)
+        reshape(scores, nkv, nhead, nq, B), (1, 3, 2, 4))    # (nkv, nq, nhead, B)
+    A = reshape(batched_mul(Ckv, scores), dc, nhead, nq, B)  # (dc, nhead, nq, B)
     A, scores_out
 end
 
@@ -181,36 +181,36 @@ function absorbed_attention(
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
     # Input is (dc, N, B)
-    dc, dq, B = size(Cq)
+    dc, nq, B = size(Cq)
     nhead = div(size(denseKQ.weight, 1), dc)
-    U = denseKQ(Cq)               # (dc*nhead, dq, B)
-    _absorbed_attention(nhead, dq, Ckv, U, Kr, Qr; mask=mask, scale=scale)
+    U = denseKQ(Cq)               # (dc*nhead, nq, B)
+    _absorbed_attention(nhead, nq, Ckv, U, Kr, Qr; mask=mask, scale=scale)
 end
 
 function _absorbed_attention(
-    nhead::Int, dq::Int,
+    nhead::Int, nq::Int,
     Ckv::AbstractArray{T, 3},
     U::AbstractArray{T, 3},
     Kr::AbstractArray{T, 3},
     Qr::AbstractArray{T, 3},
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
-    dc, dkv, B = size(Ckv)
-    CkvT = batched_transpose(Ckv) # (dkv, dc, B)
-    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * dq, B)) # (dkv, nhead*dq, B)
+    dc, nkv, B = size(Ckv)
+    CkvT = batched_transpose(Ckv) # (nkv, dc, B)
+    atten = scale .* batched_mul(CkvT, reshape(U, dc, nhead * nq, B)) # (nkv, nhead*nq, B)
     # embeddings
-    KrT = permutedims(Kr, (2, 1, 3))            # (dkv, dr, B)
-    atten_embed = scale .* batched_mul(KrT, Qr) # (dkv, nhead*dq, B)
+    KrT = permutedims(Kr, (2, 1, 3))            # (nkv, dr, B)
+    atten_embed = scale .* batched_mul(KrT, Qr) # (nkv, nhead*nq, B)
     atten += atten_embed
     if !isnothing(mask)
-        atten = reshape(atten, dkv, nhead, dq, B)
+        atten = reshape(atten, nkv, nhead, nq, B)
         atten = apply_mask(atten, _heads_first_mask(mask))
-        atten = reshape(atten, dkv, :, B)
+        atten = reshape(atten, nkv, :, B)
     end
     scores = softmax(atten; dims=1)
     scores_out = permutedims(
-        reshape(scores, dkv, nhead, dq, B), (1, 3, 2, 4))   # (dkv, dq, nhead, B)
-    A = reshape(batched_mul(Ckv, scores), dc, nhead, dq, B)
+        reshape(scores, nkv, nhead, nq, B), (1, 3, 2, 4))   # (nkv, nq, nhead, B)
+    A = reshape(batched_mul(Ckv, scores), dc, nhead, nq, B)
     A, scores_out
 end
 
@@ -225,14 +225,14 @@ Therefore this works with two `dc => dh*nhead` weights rather than one `dc => dc
     Ckv * softmax(scale * Ckv^T * (W_UK_h)^T * W_UQ_h * Cq)
 
 Inputs:
-- `Cq`: latent query `(dc, dq, B)`.
-- `Ckv`: latent key-value `(dc, dkv, B)`.
+- `Cq`: latent query `(dc, nq, B)`.
+- `Ckv`: latent key-value `(dc, nkv, B)`.
 - `denseUQ`: `Dense(dc => dh*nhead)`.
 - `denseUK`: `Dense(dc => dh*nhead)`. Only its weight is used.
-- `Kr`: key embedding `(dr, dkv, B)`, shared across heads.
-- `Qr`: query embedding `(dr, nhead*dq, B)`, heads first.
+- `Kr`: key embedding `(dr, nkv, B)`, shared across heads.
+- `Qr`: query embedding `(dr, nhead*nq, B)`, heads first.
 
-Returns `A` with size `(dc, nhead, dq, B)` and `scores` with size `(dkv, dq, nhead, B)`.
+Returns `A` with size `(dc, nhead, nq, B)` and `scores` with size `(nkv, nq, nhead, B)`.
 """
 function absorbed_attention(
     nhead::Int,
@@ -242,9 +242,9 @@ function absorbed_attention(
     denseUK::Dense,
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
-    dc, dq, B = size(Cq)
-    U = _mul_WKQ_factored(nhead, Cq, denseUQ, denseUK) # (dc, nhead*dq, B)
-    _absorbed_attention(nhead, dq, Ckv, U; mask=mask, scale=scale)
+    dc, nq, B = size(Cq)
+    U = _mul_WKQ_factored(nhead, Cq, denseUQ, denseUK) # (dc, nhead*nq, B)
+    _absorbed_attention(nhead, nq, Ckv, U; mask=mask, scale=scale)
 end
 
 # with decoupled embeddings
@@ -258,9 +258,9 @@ function absorbed_attention(
     Qr::AbstractArray{T, 3},
     ; mask::Union{Nothing, M}=nothing, scale::T=one(T)
     ) where {T, M <: AbstractArray{Bool}}
-    dc, dq, B = size(Cq)
-    U = _mul_WKQ_factored(nhead, Cq, denseUQ, denseUK) # (dc, nhead*dq, B)
-    _absorbed_attention(nhead, dq, Ckv, U, Kr, Qr; mask=mask, scale=scale)
+    dc, nq, B = size(Cq)
+    U = _mul_WKQ_factored(nhead, Cq, denseUQ, denseUK) # (dc, nhead*nq, B)
+    _absorbed_attention(nhead, nq, Ckv, U, Kr, Qr; mask=mask, scale=scale)
 end
 
 """
@@ -268,25 +268,25 @@ end
 
 Calculate `W_KQ * Cq` per head as `(W_UK_h)^T * (W_UQ_h * Cq)`, without forming `W_KQ = (W_UK)^T * W_UQ`.
 Equivalent to `denseKQ(Cq)` with `denseKQ = Dense(_absorb_WUK_WUQ(nhead, W_UK, W_UQ), false)`.
-Returns size `(dc, nhead*dq, B)`
+Returns size `(dc, nhead*nq, B)`
 """
 function _mul_WKQ_factored(nhead::Int, Cq::AbstractArray{T, 3}, denseUQ::Dense, denseUK::Dense) where T
-    dc, dq, B = size(Cq)
+    dc, nq, B = size(Cq)
     dh = div(size(denseUQ.weight, 1), nhead)
-    Q = denseUQ(Cq)                                             # (dh*nhead, dq, B)
-    Q = permutedims(reshape(Q, dh, nhead, dq, B), (1, 3, 4, 2)) # (dh, dq, B, nhead)
-    Q = reshape(Q, dh, dq * B, nhead)                           # (dh, dq*B, nhead)
+    Q = denseUQ(Cq)                                             # (dh*nhead, nq, B)
+    Q = permutedims(reshape(Q, dh, nhead, nq, B), (1, 3, 4, 2)) # (dh, nq, B, nhead)
+    Q = reshape(Q, dh, nq * B, nhead)                           # (dh, nq*B, nhead)
     W_UK = reshape(denseUK.weight, dh, nhead, dc)               # (dh, nhead, dc)
     # # einsum version: q[c, h, nb] = Σ_d W_UK[d, h, c] * q0[d, h, nb]
-    # Q = reshape(Q, dh, nhead, dq * B)   # (dh, nhead, dq*B)
-    # U = similar(Q, T, dc, nhead, dq * B)
+    # Q = reshape(Q, dh, nhead, nq * B)   # (dh, nhead, nq*B)
+    # U = similar(Q, T, dc, nhead, nq * B)
     # for h in 1:nhead
     #     mul!(view(U, :, h, :), transpose(view(W_UK, :, h, :)), view(q0, :, h, :))
     # end
     W_UKT = permutedims(W_UK, (3, 1, 2))                        # (dc, dh, nhead)
-    U = batched_mul(W_UKT, Q)                                   # (dc, dq*B, nhead)
-    U = permutedims(reshape(U, dc, dq, B, nhead), (1, 4, 2, 3)) # (dc, nhead, dq, B)
-    reshape(U, dc, nhead * dq, B)
+    U = batched_mul(W_UKT, Q)                                   # (dc, nq*B, nhead)
+    U = permutedims(reshape(U, dc, nq, B, nhead), (1, 4, 2, 3)) # (dc, nhead, nq, B)
+    reshape(U, dc, nhead * nq, B)
 end
 
 """

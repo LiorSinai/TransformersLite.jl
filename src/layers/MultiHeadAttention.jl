@@ -122,7 +122,7 @@ function (mha::MultiHeadAttentionKVCache)(
     ; start_pos::Int=1, use_cache::Bool=true, kwargs...
     ) where {T, A3 <: AbstractArray{T, 3}}
     # batch multiplication version. Input is dm × N × B
-    #size(q) == (dm, dq, B)
+    #size(q) == (dm, nq, B)
     q = mha.denseQ(query)
     k = mha.denseK(key)
     v = mha.denseV(value)
@@ -155,11 +155,11 @@ function (mha::MultiHeadAttentionKVCache)(
 end
 
 function clone_add_kv_cache(mha::MultiHeadAttention, max_seq_length::Int, max_batch_size::Int)
-    dkv = size(mha.denseK.weight, 1)
+    nkv = size(mha.denseK.weight, 1)
     T = eltype(mha.denseK.weight)
     # similar puts the caches on the same device as the weights
-    cache_k = similar(mha.denseK.weight, T, dkv, max_seq_length, max_batch_size)
-    cache_v = similar(mha.denseV.weight, T, dkv, max_seq_length, max_batch_size)
+    cache_k = similar(mha.denseK.weight, T, nkv, max_seq_length, max_batch_size)
+    cache_v = similar(mha.denseV.weight, T, nkv, max_seq_length, max_batch_size)
     MultiHeadAttentionKVCache(
         mha.nhead,
         deepcopy(mha.denseQ),

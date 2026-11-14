@@ -28,8 +28,8 @@ trues_like(x::AbstractArray, sz=size(x)) = fill!(similar(x, Bool, sz), true)
 """
     _heads_first_mask(mask)
 
-Reorder a mask from the `(dkv, dq[, nhead, B])` layout used by `scaled_dot_attention`
-to the `(dkv, nhead, dq[, B])` layout used by `absorbed_attention`.
+Reorder a mask from the `(nkv, nq[, nhead, B])` layout used by `scaled_dot_attention`
+to the `(nkv, nhead, nq[, B])` layout used by `absorbed_attention`.
 The `nhead` and `B` dims of the mask may be 1 to broadcast across heads and batches.
 """
 _heads_first_mask(mask::AbstractMatrix) = reshape(mask, size(mask, 1), 1, size(mask, 2))
