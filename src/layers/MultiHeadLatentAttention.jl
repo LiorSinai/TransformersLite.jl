@@ -83,15 +83,15 @@ function (mla::MultiHeadLatentAttention)(query::A3, key::A3
     ) where {T, A3 <: AbstractArray{T, 3}, M <: AbstractArray{Bool}}
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
-    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
+    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, nq, B)
+    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, nkv, B)
     if use_cache
         mla.cache_ckv[:, start_pos:end_pos, 1:batch_dim] = ckv
         ckv = mla.cache_ckv[:, 1:end_pos, 1:batch_dim]
     end
-    K = mla.denseUK(ckv) # size(k) == (dh*nhead, dkv, B)
-    V = mla.denseUV(ckv) # size(v) == (dh*nhead, dkv, B)
-    Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, dq, B)
+    K = mla.denseUK(ckv) # size(k) == (dh*nhead, nkv, B)
+    V = mla.denseUV(ckv) # size(v) == (dh*nhead, nkv, B)
+    Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, nq, B)
     A, scores = multi_head_scaled_dot_attention(
         mla.nhead, Q, K, V, start_pos:end_pos
         ; mask=mask, embedding=mla.embedding

@@ -96,23 +96,23 @@ function MultiHeadLatentAttentionV2(;
 end
 
 function _apply_embeddings(mla::MultiHeadLatentAttentionV2, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
-    dc, dq, batch_dim = size(cq)
+    dc, nq, batch_dim = size(cq)
     kr = mla.denseKR(key)
     qr = mla.denseQR(cq)
-    kr = mla.embedding(kr, idx) # size(kr) == (dr, dkv, B)
-    qr = permutedims(reshape(qr, :, mla.nhead, dq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
+    kr = mla.embedding(kr, idx) # size(kr) == (dr, nkv, B)
+    qr = permutedims(reshape(qr, :, mla.nhead, nq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, nq, B) => (dr, nq, nhead, B)
     qr = mla.embedding(qr, idx)
     kr, qr
 end
 
 function _cat_decoupled_embedding(nhead::Int, Q::A3, qr::A4, K::A3, kr::A3) where {T, A3 <: AbstractArray{T, 3}, A4 <: AbstractArray{T, 4}}
-    dq, dq, B = size(Q)
-    dr, dkv, _ = size(kr)
-    qr = permutedims(qr, (1, 3, 2, 4))                      # (dr, dq, nhead, B) => (dr, nhead, dq, B)
-    kr = repeat(reshape(kr, dr, 1, dkv, B), 1, nhead, 1, 1) # (dr, dkv, B) => (dr, nhead, dkv, B)
-    Q = cat(reshape(Q, :, nhead, dq, B), qr; dims=1)        # (dh+dr, nhead, dq, B)
-    K = cat(reshape(K, :, nhead, dkv, B), kr; dims=1)       # (dh+dr, nhead, dkv, B)
-    reshape(Q, :, dq, B), reshape(K, :, dkv, B)             # (nhead*(dh+dr), N, B)
+    nq, nq, B = size(Q)
+    dr, nkv, _ = size(kr)
+    qr = permutedims(qr, (1, 3, 2, 4))                      # (dr, nq, nhead, B) => (dr, nhead, nq, B)
+    kr = repeat(reshape(kr, dr, 1, nkv, B), 1, nhead, 1, 1) # (dr, nkv, B) => (dr, nhead, nkv, B)
+    Q = cat(reshape(Q, :, nhead, nq, B), qr; dims=1)        # (dh+dr, nhead, nq, B)
+    K = cat(reshape(K, :, nhead, nkv, B), kr; dims=1)       # (dh+dr, nhead, nkv, B)
+    reshape(Q, :, nq, B), reshape(K, :, nkv, B)             # (nhead*(dh+dr), N, B)
 end
 
 function (mla::MultiHeadLatentAttentionV2)(query::A3, key::A3; kwargs...) where {T, A3 <: AbstractArray{T, 3}}
@@ -126,8 +126,8 @@ function mla_naive(
     # batch multiplication version. Input is dm × N × nhead*B
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
-    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
+    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, nq, B)
+    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, nkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     if use_cache
         mla.cache_ckv[:, start_pos:end_pos, 1:batch_dim] = ckv
@@ -135,9 +135,9 @@ function mla_naive(
         ckv = mla.cache_ckv[:, 1:end_pos, 1:batch_dim]
         kr = mla.cache_kr[:, 1:end_pos, 1:batch_dim]
     end
-    K = mla.denseUK(ckv) # size(k) == (dh*nhead, dkv, B)
-    V = mla.denseUV(ckv) # size(v) == (dh*nhead, dkv, B)
-    Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, dq, B)
+    K = mla.denseUK(ckv) # size(k) == (dh*nhead, nkv, B)
+    V = mla.denseUV(ckv) # size(v) == (dh*nhead, nkv, B)
+    Q = mla.denseUQ(cq)  # size(q) == (dh*nhead, nq, B)
     Q, K = _cat_decoupled_embedding(mla.nhead, Q, qr, K, kr)
     A, scores = multi_head_scaled_dot_attention(
         mla.nhead, Q, K, V

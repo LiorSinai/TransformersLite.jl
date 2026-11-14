@@ -153,13 +153,13 @@ function _absorb_WO_WUV(nhead::Int, W_O::AbstractMatrix, W_UV::AbstractMatrix)
 end
 
 function _apply_embeddings(mla::MultiHeadLatentAttentionV3, key::A3, cq::A3, idx::UnitRange{Int}) where {T, A3 <: AbstractArray{T, 3}}
-    dc, dq, batch_dim = size(cq)
+    dc, nq, batch_dim = size(cq)
     kr = mla.denseKR(key)
     qr = mla.denseQR(cq)
-    kr = mla.embedding(kr, idx) # size(kr) == (dr, dkv, B)
+    kr = mla.embedding(kr, idx) # size(kr) == (dr, nkv, B)
     # qr will be reshaped later for absorbed_attention
     # but need it in the expected shape for embedding (RoPE) now
-    qr = permutedims(reshape(qr, :, mla.nhead, dq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, dq, B) => (dr, dq, nhead, B)
+    qr = permutedims(reshape(qr, :, mla.nhead, nq, batch_dim), (1, 3, 2, 4)) # (dr*nhead, nq, B) => (dr, nq, nhead, B)
     qr = mla.embedding(qr, idx)
     kr, qr
 end
@@ -175,8 +175,8 @@ function mla_absorb(
     # batch multiplication version. Input is dm × N × nhead*B
     dm, seq_length, batch_dim = size(key)
     end_pos = start_pos + seq_length - 1
-    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, dq, B)
-    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, dkv, B)
+    cq = mla.norm_cq(mla.denseDQ(query))  # size(cq) == (dc, nq, B)
+    ckv = mla.norm_ckv(mla.denseDKV(key)) # size(ckv) == (dc, nkv, B)
     kr, qr = _apply_embeddings(mla, key, cq, start_pos:end_pos)
     dr = size(kr, 1)
     if use_cache
@@ -188,14 +188,14 @@ function mla_absorb(
     # softmax(1/sqrt(dh + dr) * K^T * Q)
     # = softmax(1/sqrt(dh + dr) * ckv^T * W_UK^T * W_QU * cq)
     # = softmax(1/sqrt(dh + dr) * ckv^T * W_KQ * cq)
-    dc, dq, _ = size(cq)
+    dc, nq, _ = size(cq)
     scale = T(1 / sqrt(mla.dim_head + dr))
     qr = reshape(permutedims(qr, (1, 3, 2, 4)), dr, :, batch_dim)
     A, scores = absorbed_attention(
-        cq, ckv, mla.denseKQ, kr, qr; mask=mask, scale=scale) # (dc, nhead, N, B), (N, dq, nhead, B)
-    A = reshape(A, :, dq, batch_dim)
+        cq, ckv, mla.denseKQ, kr, qr; mask=mask, scale=scale) # (dc, nhead, N, B), (N, nq, nhead, B)
+    A = reshape(A, :, nq, batch_dim)
     # W_O * V * A
     # = W_O * (W_V * ckv) * A
     # = W_OV * A
-    mla.denseOV(A), scores # (dout, dq, B), (N, dq, nhead, B)
+    mla.denseOV(A), scores # (dout, nq, B), (N, nq, nhead, B)
 end
