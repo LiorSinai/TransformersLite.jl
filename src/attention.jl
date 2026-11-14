@@ -55,11 +55,11 @@ function scaled_dot_attention(
     # Input is (dh, N, nhead)
     dh = size(query, 1)
     scale = T(1 / sqrt(dh))
-    keyT = batched_transpose(key) # (dkv, dh, nhead)
-    atten = scale .* batched_mul(keyT, query) # (dkv, dh, nhead)*(dh, dq, nhead) => (dkv, dq, nhead)
-    atten = apply_mask(atten, mask) # (dkv, dq, nhead)
-    scores = softmax(atten; dims=1) # (dkv, dq, nhead)
-    batched_mul(value, scores), scores  # (dh, dkv, nhead)*(dkv, dq, nhead) => (dh, dq, nhead)
+    keyT = batched_transpose(key) # (nkv, dh, nhead)
+    atten = scale .* batched_mul(keyT, query) # (nkv, dh, nhead)*(dh, nq, nhead) => (nkv, nq, nhead)
+    atten = apply_mask(atten, mask) # (nkv, nq, nhead)
+    scores = softmax(atten; dims=1) # (nkv, nq, nhead)
+    batched_mul(value, scores), scores  # (dh, nkv, nhead)*(nkv, nq, nhead) => (dh, nq, nhead)
 end
 
 function scaled_dot_attention(query::A4, key::A4, value::A4; kwargs...) where {T, A4 <: AbstractArray{T, 4}}
@@ -78,8 +78,8 @@ function scaled_dot_attention(
     ## Matrix version for a single head. Input is (dh, N)
     dh = size(query, 1)
     scale = T(1 / sqrt(dh))
-    atten = scale .* transpose(key) * query # (dkv, dh)*(dh, dq) => (dkv, dq)
-    atten = apply_mask(atten, mask) # (dkv, dq)
-    scores = softmax(atten; dims=1) # (dkv, dq)
-    value * scores, scores          # (dh, dkv)*(dkv, dq) => (dh, dq)
+    atten = scale .* transpose(key) * query # (nkv, dh)*(dh, nq) => (nkv, nq)
+    atten = apply_mask(atten, mask) # (nkv, nq)
+    scores = softmax(atten; dims=1) # (nkv, nq)
+    value * scores, scores          # (dh, nkv)*(nkv, nq) => (dh, nq)
 end
