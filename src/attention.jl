@@ -107,16 +107,19 @@ end
 """
     absorbed_attention(Cq, Ckv, denseKQ[, Kr, Qr]; mask=nothing, scale=one(T))
 
-Latent attention with absorbed weights.
+Latent attention with absorbed weights. The calculation is:
+
+    U = denseKQ(Cq)
+    A = Ckv * softmax(scale * (Ckv^T * U + Kr^T * Qr)
+
+along with masking of the softmax.
 
 The latents `Cq` and `Ckv` are shared by all heads and only the weight `W_KQ` of `denseKQ` differs per head.
-So instead of batching over heads, the heads are folded into a matrix dim of the per-head operand:
+Therefore the head blocks of `W_KQ` are stacked along rows/columns to perform the batched multiplication:
 
-    [W_1; W_2; …] * X = [W_1 * X; W_2 * X; …]    # shared operand on the right: heads as rows
-    X * [U_1  U_2  …] = [X * U_1  X * U_2  …]    # shared operand on the left: heads as columns
+    [W_1; W_2; … ; W_h] * X = [W_1 * X; W_2 * X; … ; W_h * X] # shared operand on the right: head blocks as rows
+    X * [U_1  U_2  … U_h ] = [X * U_1  X * U_2  … X * U_h]    # shared operand on the left: head blocks as columns
 
-Heads are placed between the feature and token dims, `(dc, nhead, N)`,
-so that a `reshape` merges them for free into either the rows `(dc*nhead, N)` or the columns `(dc, nhead*N)`.
 This replaces the `nhead*B` small matrix multiplications of `absorbed_attention_broadcasted`
 with one large multiplication and `B` medium ones.
 
@@ -128,14 +131,6 @@ Inputs:
 - `Qr`: query embedding `(dr, nhead*nq, B)`, heads first.
 
 Returns `A` with size `(dc, nhead, nq, B)` and `scores` with size `(nkv, nq, nhead, B)`.
-The calculation is:
-
-    U = denseKQ(Cq)                                       # (dc*nhead, nq, B)
-    U = reshape(U, dc, nhead*nq, B)                       # (dc, nhead*nq, B)
-    S = softmax(scale * (Ckv^T * U + Kr^T * Qr); dims=1)  # (nkv, nhead*nq, B)
-    A = Ckv * S                                           # (dc, nhead*nq, B)
-
-where `*` is batched over `B` and the `mask` is applied before the softmax if it is not `nothing`.
 """
 function absorbed_attention(
     Cq::AbstractArray{T, 3},
@@ -221,6 +216,7 @@ Latent attention with absorbed weights, following the method of the DeepSeek sou
 
 Instead of precomputing `W_KQ = (W_UK)^T * W_UQ` per head, each factor is multiplied separately.
 Therefore this works with two `dc => dh*nhead` weights rather than one `dc => dc*nhead`.
+The calculation is:
 
     Ckv * softmax(scale * Ckv^T * (W_UK_h)^T * W_UQ_h * Cq)
 
