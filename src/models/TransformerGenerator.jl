@@ -16,27 +16,30 @@ end
 
 Flux.@layer :ignore TransformerGenerator trainable=(embedding, position_encoding, blocks, dropout, head)
 
-function (t::TransformerGenerator)(x::A; mask::M=crop_mask(t.mask, size(x, 1))) where {
-    A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
+function (t::TransformerGenerator)(x::A
+    ; start_pos::Int=1, use_cache::Bool=false,
+    mask::M=crop_mask(t.mask, start_pos, start_pos + size(x, 1) - 1),
+    ) where {A<:AbstractArray, M<:Union{Nothing, AbstractMatrix{Bool}}}
     x = t.embedding(x)              # (dm, N, B)
     N = size(x, 2)
-    x = x .+ t.position_encoding(1:N) # (dm, N, B)
+    x = x .+ t.position_encoding(start_pos:(start_pos + N - 1)) # (dm, N, B)
     x = t.dropout(x)                # (dm, N, B)
     for block in t.blocks
-        x = block(x; mask=mask)     # (dm, N, B)
+        x = block(x; mask=mask, start_pos=start_pos, use_cache=use_cache) # (dm, N, B)
     end
     x = t.head(x)                   # (vocab_size, N, B)
     x
 end
 
 """
-    crop_mask(mask, n)
+    crop_mask(mask, start_pos, end_pos)
 
-Return the top left `n×n` block of `mask`, so that a mask made for the full context
-can be used with shorter inputs.
+Return the block of `mask` for keys at positions `1:end_pos` and queries at positions `start_pos:end_pos`,
+so that a mask made for the full context can be used with shorter inputs and with a KV cache.
+Without a cache `start_pos == 1` and this is the top left `end_pos×end_pos` block.
 """
-crop_mask(::Nothing, ::Int) = nothing
-crop_mask(mask::AbstractMatrix, n::Int) = view(mask, 1:n, 1:n)
+crop_mask(::Nothing, ::Int, ::Int) = nothing
+crop_mask(mask::AbstractMatrix, start_pos::Int, end_pos::Int) = view(mask, 1:end_pos, start_pos:end_pos)
 
 """
     generate([rng,] transformer, context; context_size, max_tokens=100)
@@ -59,14 +62,62 @@ function generate(
     context
 end
 
+"""
+    generate_with_cache([rng,] transformer, context; max_tokens=100)
+
+Generate batches of tokens starting from a given context using a KV cache.
+The model must have caches, see `clone_add_kv_cache`.
+
+The whole context is passed through the model once to fill the cache.
+After that only the newest token is passed through the model at each step.
+Unlike `generate`, the context is never cropped, so the total length must fit in the cache.
+"""
+function generate_with_cache(
+    rng::AbstractRNG, model::TransformerGenerator, context::AbstractMatrix{T}
+    ; max_tokens::Int=100,
+    ) where T
+    total_length = size(context, 1) + max_tokens - 1
+    if !isnothing(model.mask) && total_length > size(model.mask, 1)
+        error("context length + max_tokens - 1 = $total_length exceeds maximum length of $(size(model.mask, 1))")
+    end
+    tokens = context # first pass fills the cache with the whole context
+    start_pos = 1
+    for i in 1:max_tokens
+        end_pos = start_pos + size(tokens, 1) - 1
+        logits = model(tokens; start_pos=start_pos, use_cache=true) # (vocab_size, n, B)
+        # only focus on the last token
+        logits = logits[:, end, :] |> cpu # (vocab_size, B)
+        context_next = multinomial_sampling(rng, logits)
+        context = cat(context, transpose(context_next); dims=1)
+        tokens = reshape(context_next, 1, :) # (1, B)
+        start_pos = end_pos + 1
+    end
+    context
+end
+
 function generate(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
     generate(Random.default_rng(), model, context; kwargs...)
+end
+
+function generate_with_cache(model::TransformerGenerator, context::AbstractMatrix; kwargs...)
+    generate_with_cache(Random.default_rng(), model, context; kwargs...)
 end
 
 function multinomial_sampling(rng::AbstractRNG, logits::AbstractMatrix)
     probs = softmax(logits; dims=1)
     tokens = [sample(rng, Weights(p)) for p in eachcol(probs)]
     tokens
+end
+
+function clone_add_kv_cache(model::TransformerGenerator, max_seq_length::Int, max_batch_size::Int)
+    TransformerGenerator(
+        deepcopy(model.embedding),
+        deepcopy(model.position_encoding),
+        deepcopy(model.dropout),
+        [clone_add_kv_cache(b, max_seq_length, max_batch_size) for b in model.blocks],
+        deepcopy(model.head),
+        deepcopy(model.mask),
+    )
 end
 
 ## Show
